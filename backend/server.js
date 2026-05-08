@@ -18,8 +18,8 @@ const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || '';
 const TRANSLATION_MODEL = process.env.TRANSLATION_MODEL || 'gpt-4o-mini';
 const TRANSCRIPTION_MODEL = process.env.TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe';
+const DIARIZE_MODEL = process.env.DIARIZE_MODEL || 'gpt-4o-transcribe-diarize';
 const TTS_MODEL = process.env.TTS_MODEL || 'gpt-4o-mini-tts';
-const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY || '';
 
 const uploadDir = 'uploads';
 const outputDir = 'outputs';
@@ -39,16 +39,22 @@ app.use('/outputs', express.static(outputDir));
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.get('/', (req, res) => {
-  res.json({ ok: true, app: 'ViralVoice API', mode: 'AI Video Dubbing', endpoints: ['/api/health', '/api/dub-video'] });
+  res.json({
+    ok: true,
+    app: 'ViralVoice API',
+    mode: 'OpenAI AI Video Dubbing',
+    endpoints: ['/api/health', '/api/dub-video']
+  });
 });
 
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     openaiKey: Boolean(process.env.OPENAI_API_KEY),
-    assemblyAiKey: Boolean(ASSEMBLYAI_API_KEY),
+    openAiDiarization: true,
     ffmpeg: Boolean(ffmpegPath),
     transcriptionModel: TRANSCRIPTION_MODEL,
+    diarizeModel: DIARIZE_MODEL,
     translationModel: TRANSLATION_MODEL,
     ttsModel: TTS_MODEL
   });
@@ -84,9 +90,9 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
     let speakers = ['A'];
     let multiVoiceUsed = false;
 
-    if (multiVoiceRequested && ASSEMBLYAI_API_KEY) {
-      const diarized = await diarizeWithAssemblyAi(extractedAudioPath);
-      const utterances = normalizeUtterances(diarized.utterances || []);
+    if (multiVoiceRequested) {
+      const diarized = await diarizeWithOpenAi(extractedAudioPath);
+      const utterances = normalizeOpenAiDiarizedSegments(diarized);
 
       if (utterances.length > 1) {
         const translatedUtterances = await translateUtterances(utterances, targetLanguage);
@@ -94,12 +100,17 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
         translation = translatedUtterances.map(item => `Speaker ${item.speaker}: ${item.text}`).join('\n');
         speakers = [...new Set(translatedUtterances.map(item => item.speaker))];
         await buildMultiVoiceAudio(translatedUtterances, dubbedAudioPath, safeId);
-        multiVoiceUsed = true;
+        multiVoiceUsed = speakers.length > 1;
       }
     }
 
     if (!multiVoiceUsed) {
-      const transcriptResponse = await client.audio.transcriptions.create({ file: fs.createReadStream(extractedAudioPath), model: TRANSCRIPTION_MODEL });
+      const transcriptResponse = await client.audio.transcriptions.create({
+        file: fs.createReadStream(extractedAudioPath),
+        model: TRANSCRIPTION_MODEL,
+        response_format: 'json'
+      });
+
       transcript = transcriptResponse.text || '';
       if (!transcript.trim()) throw new Error('Aucune voix détectée dans le fichier');
 
@@ -154,42 +165,36 @@ async function replaceVideoAudio(videoPath, audioPath, outputPath) {
   await execFileAsync(ffmpegPath, ['-y', '-i', videoPath, '-i', audioPath, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', '-shortest', outputPath]);
 }
 
-async function diarizeWithAssemblyAi(audioPath) {
-  const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
-    method: 'POST',
-    headers: { authorization: ASSEMBLYAI_API_KEY },
-    body: fs.readFileSync(audioPath)
+async function diarizeWithOpenAi(audioPath) {
+  return await client.audio.transcriptions.create({
+    file: fs.createReadStream(audioPath),
+    model: DIARIZE_MODEL,
+    response_format: 'diarized_json',
+    chunking_strategy: 'auto'
   });
-
-  if (!uploadResponse.ok) throw new Error('Erreur upload AssemblyAI');
-  const uploadData = await uploadResponse.json();
-
-  const transcriptResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
-    method: 'POST',
-    headers: { authorization: ASSEMBLYAI_API_KEY, 'content-type': 'application/json' },
-    body: JSON.stringify({ audio_url: uploadData.upload_url, language_detection: true, speaker_labels: true })
-  });
-
-  if (!transcriptResponse.ok) throw new Error('Erreur lancement diarisation AssemblyAI');
-  const transcriptData = await transcriptResponse.json();
-  const transcriptId = transcriptData.id;
-
-  for (let attempt = 0; attempt < 60; attempt++) {
-    await wait(3000);
-    const pollResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, { headers: { authorization: ASSEMBLYAI_API_KEY } });
-    const pollData = await pollResponse.json();
-    if (pollData.status === 'completed') return pollData;
-    if (pollData.status === 'error') throw new Error(pollData.error || 'Erreur diarisation AssemblyAI');
-  }
-
-  throw new Error('Diarisation trop longue. Essaie une vidéo plus courte.');
 }
 
-function normalizeUtterances(utterances) {
-  return utterances
+function normalizeOpenAiDiarizedSegments(diarized) {
+  const rawSegments = Array.isArray(diarized?.segments) ? diarized.segments : [];
+
+  return rawSegments
     .filter(item => item.text && item.text.trim())
-    .slice(0, 40)
-    .map(item => ({ speaker: String(item.speaker || 'A').replace('Speaker ', ''), text: item.text.trim() }));
+    .slice(0, 60)
+    .map((item, index) => ({
+      index,
+      speaker: normalizeSpeakerName(item.speaker || item.speaker_id || 'A'),
+      start: Number(item.start || 0),
+      end: Number(item.end || 0),
+      text: item.text.trim()
+    }));
+}
+
+function normalizeSpeakerName(value) {
+  const clean = String(value || 'A').replace('Speaker', '').replace('speaker', '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  if (!clean) return 'A';
+  if (clean.length === 1) return clean;
+  if (/^\d+$/.test(clean)) return String.fromCharCode(65 + (Number(clean) % 26));
+  return clean.charAt(0);
 }
 
 async function translateUtterances(utterances, targetLanguage) {
@@ -281,10 +286,6 @@ function formatSrtTime(totalSeconds) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')},000`;
-}
-
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 app.listen(PORT, () => {
