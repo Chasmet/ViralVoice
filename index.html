@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#080812" />
   <meta name="description" content="ViralVoice transforme une vidéo ou un audio en doublage IA traduit avec OpenAI." />
   <title>ViralVoice - Doublage vidéo IA</title>
-  <link rel="manifest" href="manifest.json?v=20260508e" />
-  <link rel="stylesheet" href="style.css?v=20260508e" />
+  <link rel="manifest" href="manifest.json?v=20260508g" />
+  <link rel="stylesheet" href="style.css?v=20260508g" />
 </head>
 <body>
   <main class="app">
@@ -17,49 +17,27 @@
       <h1>Ta vidéo parle toutes les langues.</h1>
       <p class="subtitle">
         Importe une vidéo, choisis une langue, puis ViralVoice génère une voix IA traduite.
-        V1 simple : doublage audio propre, sans synchronisation labiale complète.
+        V2 ajoute le mode multi-voix automatique pour reconnaître plusieurs locuteurs.
       </p>
     </section>
 
     <section class="card prices">
       <div class="section-title">
         <h2>Plans ViralVoice</h2>
-        <span class="badge">V1 prête</span>
+        <span class="badge">V2 multi-voix</span>
       </div>
 
       <div class="plans">
-        <article class="plan">
-          <h3>Découverte</h3>
-          <strong>1,99 €</strong>
-          <p>1 minute</p>
-        </article>
-
-        <article class="plan">
-          <h3>Créateur</h3>
-          <strong>6,99 €</strong>
-          <p>5 minutes</p>
-        </article>
-
-        <article class="plan featured">
-          <span>Populaire</span>
-          <h3>Viral</h3>
-          <strong>11,99 €</strong>
-          <p>10 minutes</p>
-        </article>
-
-        <article class="plan">
-          <h3>Pro</h3>
-          <strong>29,99 €</strong>
-          <p>30 minutes</p>
-        </article>
+        <article class="plan"><h3>Découverte</h3><strong>1,99 €</strong><p>1 minute</p></article>
+        <article class="plan"><h3>Créateur</h3><strong>6,99 €</strong><p>5 minutes</p></article>
+        <article class="plan featured"><span>Populaire</span><h3>Viral</h3><strong>11,99 €</strong><p>10 minutes</p></article>
+        <article class="plan"><h3>Pro</h3><strong>29,99 €</strong><p>30 minutes</p></article>
       </div>
     </section>
 
     <section id="adminPanel" class="card admin-panel hidden">
       <h2>Réglage admin</h2>
-      <p class="hint">
-        Cette zone est cachée aux utilisateurs. Elle sert uniquement à configurer ton backend.
-      </p>
+      <p class="hint">Cette zone est cachée aux utilisateurs. Elle sert uniquement à configurer ton backend.</p>
       <label for="backendUrl">URL backend Render</label>
       <input id="backendUrl" type="url" placeholder="https://viralvoice.onrender.com" autocomplete="off" />
       <div class="actions two">
@@ -67,17 +45,16 @@
         <button id="testBackendBtn" class="secondary" type="button">Tester</button>
       </div>
       <div id="backendStatus" class="notice">Service en attente.</div>
+      <p class="hint">Pour le mode multi-voix auto, Render doit avoir aussi la variable ASSEMBLYAI_API_KEY.</p>
     </section>
 
     <section class="card">
       <h2>1. Vidéo ou audio à doubler</h2>
-
       <label class="file-zone" for="mediaFile">
         <span class="file-icon">🎬</span>
         <strong>Choisir une vidéo ou un audio</strong>
         <small>MP4, MOV, WEBM, MP3, WAV, M4A - test conseillé : fichier court</small>
       </label>
-
       <input id="mediaFile" type="file" accept="video/*,audio/*,.mp4,.mov,.webm,.mp3,.wav,.m4a" hidden />
       <div id="fileInfo" class="file-info">Aucun fichier sélectionné</div>
       <video id="sourcePreview" controls playsinline class="media-preview hidden"></video>
@@ -100,7 +77,7 @@
       </div>
 
       <div>
-        <label for="voiceMode">3. Voix IA</label>
+        <label for="voiceMode">3. Voix IA simple</label>
         <select id="voiceMode">
           <option value="alloy">Neutre</option>
           <option value="ash">Grave</option>
@@ -112,7 +89,19 @@
     </section>
 
     <section class="card">
-      <h2>4. Options</h2>
+      <h2>4. Mode intelligent</h2>
+      <label class="switch-row" for="multiVoiceMode">
+        <input id="multiVoiceMode" type="checkbox" checked />
+        <span>
+          <strong>Multi-voix automatique</strong>
+          <small>Détecte Speaker A, Speaker B, Speaker C et attribue automatiquement une voix différente.</small>
+        </span>
+      </label>
+      <p class="hint">Si la clé AssemblyAI n’est pas configurée, ViralVoice repasse automatiquement en mode 1 voix.</p>
+    </section>
+
+    <section class="card">
+      <h2>5. Options audio</h2>
       <label for="voiceVolume">Volume voix IA</label>
       <input id="voiceVolume" type="range" min="60" max="130" value="100" />
       <div class="range-row"><span>Doux</span><strong id="voiceVolumeValue">100%</strong><span>Fort</span></div>
@@ -133,26 +122,23 @@
 
     <section id="resultCard" class="card hidden">
       <h2>Résultat</h2>
-      <p class="hint">Voix générée par IA. Pour une vraie synchronisation labiale, il faudra brancher ensuite Sync30 ou un moteur lip-sync.</p>
-
+      <p id="speakerInfo" class="hint">Voix générée par IA.</p>
       <video id="finalVideo" controls playsinline class="media-preview hidden"></video>
       <audio id="finalAudio" controls class="media-preview hidden"></audio>
-
       <div class="actions two">
         <a id="downloadVideoBtn" class="download hidden" download>Télécharger vidéo</a>
         <a id="downloadAudioBtn" class="download hidden" download>Télécharger audio</a>
       </div>
-
       <label for="outputText">Texte traduit</label>
       <textarea id="outputText" readonly></textarea>
     </section>
 
     <section class="card warning">
-      <h2>Limite V1</h2>
+      <h2>Limite actuelle</h2>
       <p>Cette version traduit et double la voix. Elle ne modifie pas encore parfaitement les lèvres du personnage.</p>
     </section>
   </main>
 
-  <script src="script.js?v=20260508e"></script>
+  <script src="script.js?v=20260508g"></script>
 </body>
 </html>
