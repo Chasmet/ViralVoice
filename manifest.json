@@ -1,0 +1,17 @@
+{
+  "name": "ViralVoice",
+  "short_name": "ViralVoice",
+  "description": "Doublage vidéo et audio IA en plusieurs langues.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#080812",
+  "theme_color": "#080812",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
