@@ -3,8 +3,14 @@ const fileInfo = document.getElementById('fileInfo');
 const dubBtn = document.getElementById('dubBtn');
 const backendUrl = document.getElementById('backendUrl');
 const saveBackendBtn = document.getElementById('saveBackendBtn');
+const testBackendBtn = document.getElementById('testBackendBtn');
+const backendStatus = document.getElementById('backendStatus');
 const targetLang = document.getElementById('targetLang');
 const voiceMode = document.getElementById('voiceMode');
+const voiceVolume = document.getElementById('voiceVolume');
+const voiceVolumeValue = document.getElementById('voiceVolumeValue');
+const originalVolume = document.getElementById('originalVolume');
+const originalVolumeValue = document.getElementById('originalVolumeValue');
 const statusCard = document.getElementById('statusCard');
 const statusText = document.getElementById('statusText');
 const resultCard = document.getElementById('resultCard');
@@ -13,65 +19,114 @@ const finalVideo = document.getElementById('finalVideo');
 const finalAudio = document.getElementById('finalAudio');
 const downloadVideoBtn = document.getElementById('downloadVideoBtn');
 const downloadAudioBtn = document.getElementById('downloadAudioBtn');
+const sourcePreview = document.getElementById('sourcePreview');
+const sourceAudioPreview = document.getElementById('sourceAudioPreview');
 
 const BACKEND_KEY = 'viralvoice-backend-url';
-backendUrl.value = localStorage.getItem(BACKEND_KEY) || '';
+const MAX_FILE_SIZE = 80 * 1024 * 1024;
+let sourceObjectUrl = null;
+let currentResultUrls = [];
 
-saveBackendBtn.addEventListener('click', async () => {
+const sameOriginBackend = `${window.location.origin}`;
+const savedBackend = localStorage.getItem(BACKEND_KEY) || '';
+backendUrl.value = savedBackend;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+voiceVolume.addEventListener('input', () => {
+  voiceVolumeValue.textContent = `${voiceVolume.value}%`;
+});
+
+originalVolume.addEventListener('input', () => {
+  originalVolumeValue.textContent = `${originalVolume.value}%`;
+});
+
+saveBackendBtn.addEventListener('click', () => {
   const backend = cleanBackendUrl(backendUrl.value);
-
   if (!backend) {
-    alert('Colle ton URL Render');
+    showBackendStatus('Colle une URL qui commence par https://', 'error');
     return;
   }
-
   backendUrl.value = backend;
   localStorage.setItem(BACKEND_KEY, backend);
-
-  try {
-    const response = await fetch(`${backend}/api/health`);
-    const data = await response.json();
-
-    if (data.ok) {
-      alert('Backend connecté');
-    } else {
-      alert('Backend sauvegardé, mais réponse étrange');
-    }
-  } catch (error) {
-    alert('URL sauvegardée, mais le backend ne répond pas encore');
-  }
+  showBackendStatus('Backend sauvegardé sur ce téléphone.', 'success');
 });
+
+testBackendBtn.addEventListener('click', testBackendConnection);
 
 mediaFile.addEventListener('change', () => {
   resetResult();
+  resetSourcePreview();
 
-  const file = mediaFile.files[0];
-
+  const file = mediaFile.files && mediaFile.files[0] ? mediaFile.files[0] : null;
   if (!file) {
     fileInfo.textContent = 'Aucun fichier sélectionné';
     return;
   }
 
   const sizeMb = (file.size / 1024 / 1024).toFixed(2);
-  const typeLabel = file.type.startsWith('video/') ? 'Vidéo' : 'Audio';
+  const isVideo = file.type.startsWith('video/');
+  const isAudio = file.type.startsWith('audio/');
+  const typeLabel = isVideo ? 'Vidéo' : 'Audio';
   fileInfo.textContent = `${typeLabel} : ${file.name} • ${sizeMb} MB`;
 
-  if (file.size > 80 * 1024 * 1024) {
-    alert('Pour le premier test, prends une vidéo courte de moins de 80 MB.');
+  if (file.size > MAX_FILE_SIZE) {
+    showBackendStatus('Fichier lourd. Pour la V1, prends moins de 80 MB.', 'warning');
+  }
+
+  sourceObjectUrl = URL.createObjectURL(file);
+  if (isVideo) {
+    sourcePreview.src = sourceObjectUrl;
+    sourcePreview.classList.remove('hidden');
+  } else if (isAudio) {
+    sourceAudioPreview.src = sourceObjectUrl;
+    sourceAudioPreview.classList.remove('hidden');
   }
 });
 
-dubBtn.addEventListener('click', async () => {
-  const file = mediaFile.files[0];
-  const backend = cleanBackendUrl(backendUrl.value);
+dubBtn.addEventListener('click', createDub);
+
+async function testBackendConnection() {
+  const backend = getBackendUrl();
+  if (!backend) {
+    showBackendStatus('Ajoute ton URL Render ou ouvre l’app directement depuis Render.', 'error');
+    return;
+  }
+
+  try {
+    testBackendBtn.disabled = true;
+    showBackendStatus('Test du backend...', 'loading');
+    const response = await fetch(`${backend}/api/health`, { method: 'GET' });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error('Réponse backend invalide');
+    showBackendStatus(`Backend connecté : ${data.app || 'ViralVoice'}`, 'success');
+  } catch (error) {
+    showBackendStatus('Backend non joignable. Vérifie l’URL Render.', 'error');
+  } finally {
+    testBackendBtn.disabled = false;
+  }
+}
+
+async function createDub() {
+  const file = mediaFile.files && mediaFile.files[0] ? mediaFile.files[0] : null;
+  const backend = getBackendUrl();
 
   if (!backend) {
-    alert('Ajoute ton URL backend Render');
+    showBackendStatus('Ajoute ton URL backend Render avant de lancer.', 'error');
     return;
   }
 
   if (!file) {
-    alert('Choisis une vidéo ou un audio');
+    showBackendStatus('Choisis une vidéo ou un audio.', 'error');
+    return;
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    showBackendStatus('Fichier trop lourd pour la V1. Coupe une vidéo plus courte.', 'error');
     return;
   }
 
@@ -81,85 +136,95 @@ dubBtn.addEventListener('click', async () => {
     resultCard.classList.add('hidden');
     dubBtn.disabled = true;
     dubBtn.textContent = 'Traitement en cours...';
-    statusText.textContent = 'Envoi du fichier vers Render...';
-
-    localStorage.setItem(BACKEND_KEY, backend);
+    statusText.textContent = 'Envoi du fichier au backend...';
 
     const formData = new FormData();
     formData.append('media', file);
     formData.append('targetLanguage', targetLang.value);
     formData.append('voice', voiceMode.value);
+    formData.append('voiceVolume', String(Number(voiceVolume.value) / 100));
+    formData.append('originalVolume', String(Number(originalVolume.value) / 100));
 
-    setTimeout(() => {
-      if (!statusCard.classList.contains('hidden')) {
-        statusText.textContent = 'OpenAI transcrit et traduit la voix...';
-      }
-    }, 3500);
-
-    setTimeout(() => {
-      if (!statusCard.classList.contains('hidden')) {
-        statusText.textContent = 'Création de la nouvelle voix IA...';
-      }
-    }, 9000);
-
-    setTimeout(() => {
-      if (!statusCard.classList.contains('hidden')) {
-        statusText.textContent = 'Export de la vidéo finale...';
-      }
-    }, 15000);
+    scheduleStatusMessages();
 
     const response = await fetch(`${backend}/api/dub-video`, {
       method: 'POST',
       body: formData
     });
 
-    let data = null;
-
-    try {
-      data = await response.json();
-    } catch (error) {
-      throw new Error('Réponse serveur illisible');
-    }
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Erreur serveur');
-    }
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || 'Erreur serveur');
 
     outputText.value = data.translation || '';
 
     if (data.dubbedVideoUrl) {
-      finalVideo.src = data.dubbedVideoUrl;
+      const videoUrl = absoluteUrl(backend, data.dubbedVideoUrl);
+      finalVideo.src = videoUrl;
       finalVideo.classList.remove('hidden');
-      downloadVideoBtn.href = data.dubbedVideoUrl;
+      downloadVideoBtn.href = videoUrl;
       downloadVideoBtn.classList.remove('hidden');
       downloadVideoBtn.setAttribute('download', 'viralvoice-video-doublee.mp4');
     }
 
     if (data.dubbedAudioUrl) {
-      finalAudio.src = data.dubbedAudioUrl;
+      const audioUrl = absoluteUrl(backend, data.dubbedAudioUrl);
+      finalAudio.src = audioUrl;
       finalAudio.classList.remove('hidden');
-      downloadAudioBtn.href = data.dubbedAudioUrl;
+      downloadAudioBtn.href = audioUrl;
       downloadAudioBtn.classList.remove('hidden');
       downloadAudioBtn.setAttribute('download', 'viralvoice-voix-traduite.mp3');
     }
 
     resultCard.classList.remove('hidden');
     statusText.textContent = 'Terminé';
+    showBackendStatus('Doublage terminé.', 'success');
   } catch (error) {
     console.error(error);
-    alert(error.message || 'Erreur pendant le doublage');
+    showBackendStatus(error.message || 'Erreur pendant le doublage.', 'error');
   } finally {
     statusCard.classList.add('hidden');
     dubBtn.disabled = false;
-    dubBtn.textContent = '⚡ Créer la vidéo doublée';
+    dubBtn.textContent = '⚡ Créer le doublage';
   }
-});
+}
+
+function scheduleStatusMessages() {
+  setTimeout(() => {
+    if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Transcription de la voix originale...';
+  }, 2500);
+
+  setTimeout(() => {
+    if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Traduction du texte...';
+  }, 7000);
+
+  setTimeout(() => {
+    if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Création de la voix IA...';
+  }, 12000);
+
+  setTimeout(() => {
+    if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Préparation du fichier final...';
+  }, 18000);
+}
+
+function getBackendUrl() {
+  const manual = cleanBackendUrl(backendUrl.value || localStorage.getItem(BACKEND_KEY) || '');
+  if (manual) return manual;
+
+  const host = window.location.hostname;
+  if (host.includes('onrender.com') || host === 'localhost' || host === '127.0.0.1') {
+    return sameOriginBackend;
+  }
+
+  return '';
+}
 
 function resetResult() {
+  finalVideo.pause();
   finalVideo.removeAttribute('src');
   finalVideo.load();
   finalVideo.classList.add('hidden');
 
+  finalAudio.pause();
   finalAudio.removeAttribute('src');
   finalAudio.load();
   finalAudio.classList.add('hidden');
@@ -171,8 +236,46 @@ function resetResult() {
   downloadAudioBtn.classList.add('hidden');
 
   outputText.value = '';
+  currentResultUrls.forEach(url => URL.revokeObjectURL(url));
+  currentResultUrls = [];
+}
+
+function resetSourcePreview() {
+  if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
+  sourceObjectUrl = null;
+  sourcePreview.pause();
+  sourcePreview.removeAttribute('src');
+  sourcePreview.load();
+  sourcePreview.classList.add('hidden');
+  sourceAudioPreview.pause();
+  sourceAudioPreview.removeAttribute('src');
+  sourceAudioPreview.load();
+  sourceAudioPreview.classList.add('hidden');
 }
 
 function cleanBackendUrl(url) {
-  return String(url || '').trim().replace(/\/$/, '');
+  const clean = String(url || '').trim().replace(/\/+$/, '');
+  if (!clean) return '';
+  return clean.startsWith('https://') || clean.startsWith('http://localhost') ? clean : '';
+}
+
+function showBackendStatus(text, type = '') {
+  backendStatus.textContent = text;
+  backendStatus.className = 'notice';
+  if (type) backendStatus.classList.add(type);
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    return { error: text || 'Réponse serveur illisible' };
+  }
+}
+
+function absoluteUrl(backend, url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) return url;
+  return `${backend}${url.startsWith('/') ? '' : '/'}${url}`;
 }
