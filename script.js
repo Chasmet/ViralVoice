@@ -25,6 +25,7 @@ const downloadAudioBtn = document.getElementById('downloadAudioBtn');
 const sourcePreview = document.getElementById('sourcePreview');
 const sourceAudioPreview = document.getElementById('sourceAudioPreview');
 
+const APP_VERSION = '20260508f';
 const BACKEND_KEY = 'viralvoice-backend-url';
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
 const DEFAULT_BACKEND_URL = 'https://viralvoice.onrender.com';
@@ -35,18 +36,14 @@ let logoTapCount = 0;
 let logoTapTimer = null;
 
 const sameOriginBackend = `${window.location.origin}`;
-const savedBackend = localStorage.getItem(BACKEND_KEY) || DEFAULT_BACKEND_URL;
-backendUrl.value = savedBackend;
+backendUrl.value = DEFAULT_BACKEND_URL;
+localStorage.setItem(BACKEND_KEY, DEFAULT_BACKEND_URL);
 
 if (location.hash === '#admin') {
   showAdminPanel();
 }
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
-}
+clearOldServiceWorkersAndCaches();
 
 adminLogoBtn.addEventListener('click', () => {
   logoTapCount += 1;
@@ -58,7 +55,7 @@ adminLogoBtn.addEventListener('click', () => {
   if (logoTapCount >= 7) {
     logoTapCount = 0;
     showAdminPanel();
-    showBackendStatus('Mode admin ouvert.', 'success');
+    showBackendStatus(`Mode admin ouvert. Version ${APP_VERSION}`, 'success');
   }
 });
 
@@ -118,20 +115,19 @@ dubBtn.addEventListener('click', createDub);
 
 async function testBackendConnection() {
   const backend = getBackendUrl();
-  if (!backend) {
-    showBackendStatus('Aucun service configuré.', 'error');
-    return;
-  }
 
   try {
     testBackendBtn.disabled = true;
     showBackendStatus('Test du service...', 'loading');
-    const response = await fetch(`${backend}/api/health`, { method: 'GET' });
+    const response = await fetch(`${backend}/api/health?version=${APP_VERSION}`, {
+      method: 'GET',
+      cache: 'no-store'
+    });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error('Réponse service invalide');
-    showBackendStatus(`Service connecté : ${data.app || 'ViralVoice'}`, 'success');
+    showBackendStatus(`Service connecté : ${data.app || 'ViralVoice'} - clé OpenAI ${data.openaiKey ? 'OK' : 'manquante'}`, 'success');
   } catch (error) {
-    showBackendStatus('Service non joignable. Vérifie le service Render.', 'error');
+    showBackendStatus('Service Render non joignable. Vérifie que Render est bien réveillé.', 'error');
   } finally {
     testBackendBtn.disabled = false;
   }
@@ -142,11 +138,6 @@ async function createDub() {
   const backend = getBackendUrl();
 
   hideUserStatus();
-
-  if (!backend) {
-    showUserStatus('Service indisponible pour le moment.', 'error');
-    return;
-  }
 
   if (!file) {
     showUserStatus('Choisis une vidéo ou un audio.', 'error');
@@ -164,6 +155,10 @@ async function createDub() {
     resultCard.classList.add('hidden');
     dubBtn.disabled = true;
     dubBtn.textContent = 'Traitement en cours...';
+    statusText.textContent = 'Réveil du service Render...';
+
+    await pingBackend(backend);
+
     statusText.textContent = 'Préparation du fichier...';
 
     const formData = new FormData();
@@ -177,7 +172,8 @@ async function createDub() {
 
     const response = await fetch(`${backend}/api/dub-video`, {
       method: 'POST',
-      body: formData
+      body: formData,
+      cache: 'no-store'
     });
 
     const data = await readJsonResponse(response);
@@ -216,6 +212,17 @@ async function createDub() {
   }
 }
 
+async function pingBackend(backend) {
+  const response = await fetch(`${backend}/api/health?version=${APP_VERSION}`, {
+    method: 'GET',
+    cache: 'no-store'
+  });
+  const data = await response.json();
+  if (!response.ok || !data.ok) throw new Error('Service Render indisponible. Réessaie dans 30 secondes.');
+  if (!data.openaiKey) throw new Error('Clé OpenAI manquante dans Render. Ajoute OPENAI_API_KEY.');
+  return data;
+}
+
 function scheduleStatusMessages() {
   setTimeout(() => {
     if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Transcription de la voix originale...';
@@ -235,15 +242,13 @@ function scheduleStatusMessages() {
 }
 
 function getBackendUrl() {
-  const manual = cleanBackendUrl(backendUrl.value || localStorage.getItem(BACKEND_KEY) || DEFAULT_BACKEND_URL || '');
-  if (manual) return manual;
+  const manual = cleanBackendUrl(backendUrl.value || localStorage.getItem(BACKEND_KEY) || '');
+  if (manual && manual.includes('viralvoice.onrender.com')) return manual;
 
   const host = window.location.hostname;
-  if (host.includes('onrender.com') || host === 'localhost' || host === '127.0.0.1') {
-    return sameOriginBackend;
-  }
+  if (host.includes('onrender.com') || host === 'localhost' || host === '127.0.0.1') return sameOriginBackend;
 
-  return '';
+  return DEFAULT_BACKEND_URL;
 }
 
 function showAdminPanel() {
@@ -322,4 +327,19 @@ function absoluteUrl(backend, url) {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) return url;
   return `${backend}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+async function clearOldServiceWorkersAndCaches() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(reg => reg.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(key => caches.delete(key)));
+    }
+  } catch (error) {
+    console.warn('Nettoyage cache impossible', error);
+  }
 }
