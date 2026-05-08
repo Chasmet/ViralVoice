@@ -27,10 +27,31 @@ const sourcePreview = document.getElementById('sourcePreview');
 const sourceAudioPreview = document.getElementById('sourceAudioPreview');
 const speakerInfo = document.getElementById('speakerInfo');
 
-const APP_VERSION = '20260508h';
+const clientName = document.getElementById('clientName');
+const paymentStatus = document.getElementById('paymentStatus');
+const savePaymentLinksBtn = document.getElementById('savePaymentLinksBtn');
+const paymentRequestsList = document.getElementById('paymentRequestsList');
+const payInputs = {
+  decouverte: document.getElementById('payDecouverte'),
+  createur: document.getElementById('payCreateur'),
+  viral: document.getElementById('payViral'),
+  pro: document.getElementById('payPro')
+};
+
+const APP_VERSION = '20260508i';
 const BACKEND_KEY = 'viralvoice-backend-url';
+const PAYMENT_LINKS_KEY = 'viralvoice-payment-links';
+const PAYMENT_REQUESTS_KEY = 'viralvoice-payment-requests';
+const CLIENT_NAME_KEY = 'viralvoice-client-name';
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
 const DEFAULT_BACKEND_URL = 'https://viralvoice.onrender.com';
+
+const PLANS = {
+  decouverte: { label: 'Découverte', minutes: 1, price: '1,99 €' },
+  createur: { label: 'Créateur', minutes: 5, price: '6,99 €' },
+  viral: { label: 'Viral', minutes: 10, price: '11,99 €' },
+  pro: { label: 'Pro', minutes: 30, price: '29,99 €' }
+};
 
 let sourceObjectUrl = null;
 let currentResultUrls = [];
@@ -39,6 +60,9 @@ let logoTapTimer = null;
 
 const sameOriginBackend = `${window.location.origin}`;
 backendUrl.value = localStorage.getItem(BACKEND_KEY) || DEFAULT_BACKEND_URL;
+clientName.value = localStorage.getItem(CLIENT_NAME_KEY) || '';
+loadPaymentLinks();
+renderPaymentRequests();
 
 if (location.hash === '#admin') showAdminPanel();
 clearOldServiceWorkersAndCaches();
@@ -56,6 +80,13 @@ adminLogoBtn.addEventListener('click', () => {
 
 voiceVolume.addEventListener('input', () => { voiceVolumeValue.textContent = `${voiceVolume.value}%`; });
 originalVolume.addEventListener('input', () => { originalVolumeValue.textContent = `${originalVolume.value}%`; });
+clientName.addEventListener('input', () => localStorage.setItem(CLIENT_NAME_KEY, clientName.value.trim()));
+
+document.querySelectorAll('.buy-btn').forEach(button => {
+  button.addEventListener('click', () => handleBuyPlan(button.dataset.plan));
+});
+
+savePaymentLinksBtn.addEventListener('click', savePaymentLinks);
 
 saveBackendBtn.addEventListener('click', () => {
   const backend = cleanBackendUrl(backendUrl.value);
@@ -100,6 +131,102 @@ mediaFile.addEventListener('change', () => {
 });
 
 dubBtn.addEventListener('click', createDub);
+
+function handleBuyPlan(planId) {
+  const plan = PLANS[planId];
+  const name = clientName.value.trim();
+  const links = getPaymentLinks();
+  const url = links[planId];
+
+  if (!name) {
+    showPaymentStatus('Écris ton prénom avant de payer.', 'error');
+    clientName.focus();
+    return;
+  }
+
+  if (!url) {
+    showPaymentStatus('Lien de paiement pas encore configuré pour ce pack.', 'warning');
+    showAdminPanel();
+    return;
+  }
+
+  const request = {
+    id: Date.now(),
+    clientName: name,
+    planId,
+    planLabel: plan.label,
+    minutes: plan.minutes,
+    price: plan.price,
+    status: 'paiement ouvert',
+    date: new Date().toLocaleString()
+  };
+
+  const requests = getPaymentRequests();
+  requests.unshift(request);
+  localStorage.setItem(PAYMENT_REQUESTS_KEY, JSON.stringify(requests.slice(0, 50)));
+  renderPaymentRequests();
+
+  showPaymentStatus(`${plan.label} sélectionné. Paiement ouvert dans un nouvel onglet.`, 'success');
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function savePaymentLinks() {
+  const links = {
+    decouverte: cleanPaymentUrl(payInputs.decouverte.value),
+    createur: cleanPaymentUrl(payInputs.createur.value),
+    viral: cleanPaymentUrl(payInputs.viral.value),
+    pro: cleanPaymentUrl(payInputs.pro.value)
+  };
+  localStorage.setItem(PAYMENT_LINKS_KEY, JSON.stringify(links));
+  showBackendStatus('Liens de paiement sauvegardés sur ce téléphone.', 'success');
+}
+
+function loadPaymentLinks() {
+  const links = getPaymentLinks();
+  Object.keys(payInputs).forEach(key => {
+    if (payInputs[key]) payInputs[key].value = links[key] || '';
+  });
+}
+
+function getPaymentLinks() {
+  try {
+    return JSON.parse(localStorage.getItem(PAYMENT_LINKS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function cleanPaymentUrl(url) {
+  const clean = String(url || '').trim();
+  if (!clean) return '';
+  return clean.startsWith('https://') ? clean : '';
+}
+
+function getPaymentRequests() {
+  try {
+    return JSON.parse(localStorage.getItem(PAYMENT_REQUESTS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function renderPaymentRequests() {
+  if (!paymentRequestsList) return;
+  const requests = getPaymentRequests();
+
+  if (!requests.length) {
+    paymentRequestsList.innerHTML = '<p class="hint">Aucune demande enregistrée sur ce téléphone.</p>';
+    return;
+  }
+
+  paymentRequestsList.innerHTML = requests.map(item => `
+    <div class="payment-request">
+      <strong>${escapeHtml(item.clientName)} - ${escapeHtml(item.planLabel)}</strong>
+      <small>${escapeHtml(item.price)} - ${item.minutes} min - ${escapeHtml(item.date)}</small>
+      <span>${escapeHtml(item.status)}</span>
+    </div>
+  `).join('');
+}
 
 async function testBackendConnection() {
   const backend = getBackendUrl();
@@ -217,6 +344,7 @@ function getBackendUrl() {
 }
 
 function showAdminPanel() { adminPanel.classList.remove('hidden'); adminPanel.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function showPaymentStatus(text, type = '') { paymentStatus.textContent = text; paymentStatus.className = 'notice'; if (type) paymentStatus.classList.add(type); paymentStatus.classList.remove('hidden'); }
 
 function resetResult() {
   finalVideo.pause(); finalVideo.removeAttribute('src'); finalVideo.load(); finalVideo.classList.add('hidden');
@@ -255,6 +383,10 @@ function absoluteUrl(backend, url) {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) return url;
   return `${backend}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 }
 
 async function clearOldServiceWorkersAndCaches() {
