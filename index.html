@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#080812" />
+  <meta name="description" content="ViralVoice transforme une vidéo ou un audio en doublage IA traduit avec OpenAI." />
+  <title>ViralVoice - Doublage vidéo IA</title>
+  <link rel="manifest" href="manifest.json?v=20260508k" />
+  <link rel="stylesheet" href="style.css?v=20260508k" />
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <button id="adminLogoBtn" class="logo" type="button" aria-label="ViralVoice">VV</button>
+      <p class="eyebrow">Doublage vidéo IA</p>
+      <h1>Ta vidéo parle toutes les langues.</h1>
+      <p class="subtitle">Importe une vidéo, choisis une langue, puis ViralVoice génère une voix IA traduite pour publier plus vite.</p>
+    </section>
+
+    <section class="card account-card">
+      <div class="section-title">
+        <h2>Mon compte</h2>
+        <span id="walletBadge" class="badge muted-badge">0 crédit</span>
+      </div>
+
+      <label for="clientEmail">Email client</label>
+      <input id="clientEmail" type="email" placeholder="exemple@email.com" autocomplete="email" />
+
+      <p class="hint">Utilise le même email après paiement pour retrouver tes crédits.</p>
+
+      <div class="actions two">
+        <button id="checkWalletBtn" class="secondary" type="button">Vérifier mes crédits</button>
+        <button id="clearClientBtn" class="secondary" type="button">Changer de compte</button>
+      </div>
+
+      <div id="walletStatus" class="notice hidden">Solde en attente.</div>
+    </section>
+
+    <section class="card prices">
+      <div class="section-title">
+        <h2>Acheter des crédits</h2>
+        <span class="badge">Revolut</span>
+      </div>
+
+      <p class="hint">1 crédit = 1 doublage vidéo ou audio jusqu'à 60 secondes.</p>
+
+      <div class="plans">
+        <article class="plan">
+          <h3>Découverte</h3>
+          <strong>1,99 €</strong>
+          <p>1 crédit</p>
+          <button class="buy-btn" type="button" data-plan="decouverte">Acheter</button>
+        </article>
+
+        <article class="plan">
+          <h3>Créateur</h3>
+          <strong>6,99 €</strong>
+          <p>5 crédits</p>
+          <button class="buy-btn" type="button" data-plan="createur">Acheter</button>
+        </article>
+
+        <article class="plan featured">
+          <span>Populaire</span>
+          <h3>Viral</h3>
+          <strong>11,99 €</strong>
+          <p>10 crédits</p>
+          <button class="buy-btn" type="button" data-plan="viral">Acheter</button>
+        </article>
+
+        <article class="plan">
+          <h3>Pro</h3>
+          <strong>29,99 €</strong>
+          <p>30 crédits</p>
+          <button class="buy-btn" type="button" data-plan="pro">Acheter</button>
+        </article>
+      </div>
+
+      <div id="paymentStatus" class="notice hidden">Paiement en attente.</div>
+    </section>
+
+    <section id="adminPanel" class="card admin-panel hidden">
+      <h2>Réglage admin</h2>
+      <p class="hint">Zone cachée. Réservée au propriétaire de ViralVoice.</p>
+
+      <h3 class="admin-subtitle">Mode admin gratuit</h3>
+
+      <label class="switch-row" for="adminFreeMode">
+        <input id="adminFreeMode" type="checkbox" />
+        <span>
+          <strong>Activer mes générations gratuites</strong>
+          <small>Quand ce mode est actif, tes doublages ne consomment aucun crédit.</small>
+        </span>
+      </label>
+
+      <label for="adminSecretInput">Mot de passe admin Render</label>
+      <input id="adminSecretInput" type="password" placeholder="ADMIN_SECRET" autocomplete="off" />
+
+      <button id="saveAdminSecretBtn" class="secondary full" type="button">Sauvegarder le mode admin</button>
+      <div id="adminFreeStatus" class="notice hidden">Mode admin en attente.</div>
+
+      <h3 class="admin-subtitle">Ajouter des crédits à un client</h3>
+
+      <label for="adminClientEmail">Email client à créditer</label>
+      <input id="adminClientEmail" type="email" placeholder="client@email.com" autocomplete="off" />
+
+      <label for="adminTokens">Nombre de crédits</label>
+      <input id="adminTokens" type="number" min="1" value="1" />
+
+      <label for="adminPackName">Nom du pack</label>
+      <input id="adminPackName" type="text" value="Ajout manuel" />
+
+      <label for="adminAmountEur">Montant payé</label>
+      <input id="adminAmountEur" type="number" min="0" step="0.01" value="0" />
+
+      <button id="adminAddTokensBtn" class="primary admin-primary" type="button">Ajouter les crédits</button>
+      <div id="adminAddTokensStatus" class="notice hidden">Ajout en attente.</div>
+
+      <h3 class="admin-subtitle">Backend Render</h3>
+
+      <label for="backendUrl">URL backend Render</label>
+      <input id="backendUrl" type="url" placeholder="https://viralvoice.onrender.com" autocomplete="off" />
+
+      <div class="actions two">
+        <button id="saveBackendBtn" class="secondary" type="button">Sauvegarder</button>
+        <button id="testBackendBtn" class="secondary" type="button">Tester</button>
+      </div>
+
+      <div id="backendStatus" class="notice">Service en attente.</div>
+
+      <h3 class="admin-subtitle">Liens paiement</h3>
+
+      <label for="payDecouverte">Lien Découverte</label>
+      <input id="payDecouverte" type="url" placeholder="Lien du pack Découverte" />
+
+      <label for="payCreateur">Lien Créateur</label>
+      <input id="payCreateur" type="url" placeholder="Lien du pack Créateur" />
+
+      <label for="payViral">Lien Viral</label>
+      <input id="payViral" type="url" placeholder="Lien du pack Viral" />
+
+      <label for="payPro">Lien Pro</label>
+      <input id="payPro" type="url" placeholder="Lien du pack Pro" />
+
+      <button id="savePaymentLinksBtn" class="secondary full" type="button">Sauvegarder les liens</button>
+
+      <h3 class="admin-subtitle">Demandes sur ce téléphone</h3>
+      <div id="paymentRequestsList" class="payment-requests"></div>
+    </section>
+
+    <section class="card">
+      <h2>1. Vidéo ou audio à doubler</h2>
+
+      <label class="file-zone" for="mediaFile">
+        <span class="file-icon">🎬</span>
+        <strong>Choisir une vidéo ou un audio</strong>
+        <small>MP4, MOV, WEBM, MP3, WAV, M4A - fichier court conseillé</small>
+      </label>
+
+      <input id="mediaFile" type="file" accept="video/*,audio/*,.mp4,.mov,.webm,.mp3,.wav,.m4a" hidden />
+
+      <div id="fileInfo" class="file-info">Aucun fichier sélectionné</div>
+
+      <video id="sourcePreview" controls playsinline class="media-preview hidden"></video>
+      <audio id="sourceAudioPreview" controls class="media-preview hidden"></audio>
+    </section>
+
+    <section class="card grid">
+      <div>
+        <label for="targetLang">2. Langue de sortie</label>
+        <select id="targetLang">
+          <option value="anglais">Anglais</option>
+          <option value="français">Français</option>
+          <option value="espagnol">Espagnol</option>
+          <option value="arabe">Arabe</option>
+          <option value="portugais">Portugais</option>
+          <option value="italien">Italien</option>
+          <option value="allemand">Allemand</option>
+          <option value="wolof">Wolof</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="voiceMode">3. Voix IA</label>
+        <select id="voiceMode">
+          <option value="alloy">Neutre</option>
+          <option value="ash">Grave</option>
+          <option value="coral">Claire</option>
+          <option value="sage">Douce</option>
+          <option value="verse">Énergique</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. Mode voix</h2>
+      <label class="switch-row" for="multiVoiceMode">
+        <input id="multiVoiceMode" type="checkbox" />
+        <span>
+          <strong>Voix IA optimisée</strong>
+          <small>ViralVoice traduit et recrée une voix naturelle pour ta vidéo.</small>
+        </span>
+      </label>
+      <p class="hint">Le vrai lip-sync parfait n'est pas encore inclus dans cette version.</p>
+    </section>
+
+    <section class="card">
+      <h2>5. Options audio</h2>
+
+      <label for="voiceVolume">Volume voix IA</label>
+      <input id="voiceVolume" type="range" min="60" max="130" value="100" />
+      <div class="range-row">
+        <span>Doux</span>
+        <strong id="voiceVolumeValue">100%</strong>
+        <span>Fort</span>
+      </div>
+
+      <label for="originalVolume">Volume voix originale</label>
+      <input id="originalVolume" type="range" min="0" max="60" value="18" />
+      <div class="range-row">
+        <span>Muet</span>
+        <strong id="originalVolumeValue">18%</strong>
+        <span>Fond</span>
+      </div>
+    </section>
+
+    <button id="dubBtn" class="primary" type="button">⚡ Créer mon doublage</button>
+
+    <section id="statusCard" class="status hidden">
+      <div class="loader"></div>
+      <p id="statusText">Traitement en cours...</p>
+    </section>
+
+    <div id="userStatus" class="notice user-status hidden">Service en attente.</div>
+
+    <section id="resultCard" class="card hidden">
+      <h2>Résultat</h2>
+      <p id="speakerInfo" class="hint">Voix générée par IA.</p>
+
+      <video id="finalVideo" controls playsinline class="media-preview hidden"></video>
+      <audio id="finalAudio" controls class="media-preview hidden"></audio>
+
+      <div class="actions two">
+        <a id="downloadVideoBtn" class="download hidden" download>Télécharger vidéo</a>
+        <a id="downloadAudioBtn" class="download hidden" download>Télécharger audio</a>
+      </div>
+
+      <label for="outputText">Texte traduit</label>
+      <textarea id="outputText" readonly></textarea>
+    </section>
+
+    <section class="card warning">
+      <h2>Limite actuelle</h2>
+      <p>Cette version traduit et double la voix. Elle ne modifie pas encore parfaitement les lèvres du personnage.</p>
+    </section>
+  </main>
+
+  <script src="script.js?v=20260508k"></script>
+</body>
+</html>
