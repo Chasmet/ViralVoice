@@ -1,10 +1,13 @@
 const mediaFile = document.getElementById('mediaFile');
 const fileInfo = document.getElementById('fileInfo');
 const dubBtn = document.getElementById('dubBtn');
+const adminLogoBtn = document.getElementById('adminLogoBtn');
+const adminPanel = document.getElementById('adminPanel');
 const backendUrl = document.getElementById('backendUrl');
 const saveBackendBtn = document.getElementById('saveBackendBtn');
 const testBackendBtn = document.getElementById('testBackendBtn');
 const backendStatus = document.getElementById('backendStatus');
+const userStatus = document.getElementById('userStatus');
 const targetLang = document.getElementById('targetLang');
 const voiceMode = document.getElementById('voiceMode');
 const voiceVolume = document.getElementById('voiceVolume');
@@ -24,18 +27,40 @@ const sourceAudioPreview = document.getElementById('sourceAudioPreview');
 
 const BACKEND_KEY = 'viralvoice-backend-url';
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
+const DEFAULT_BACKEND_URL = '';
+
 let sourceObjectUrl = null;
 let currentResultUrls = [];
+let logoTapCount = 0;
+let logoTapTimer = null;
 
 const sameOriginBackend = `${window.location.origin}`;
-const savedBackend = localStorage.getItem(BACKEND_KEY) || '';
+const savedBackend = localStorage.getItem(BACKEND_KEY) || DEFAULT_BACKEND_URL;
 backendUrl.value = savedBackend;
+
+if (location.hash === '#admin') {
+  showAdminPanel();
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+
+adminLogoBtn.addEventListener('click', () => {
+  logoTapCount += 1;
+  clearTimeout(logoTapTimer);
+  logoTapTimer = setTimeout(() => {
+    logoTapCount = 0;
+  }, 1200);
+
+  if (logoTapCount >= 7) {
+    logoTapCount = 0;
+    showAdminPanel();
+    showBackendStatus('Mode admin ouvert.', 'success');
+  }
+});
 
 voiceVolume.addEventListener('input', () => {
   voiceVolumeValue.textContent = `${voiceVolume.value}%`;
@@ -53,7 +78,7 @@ saveBackendBtn.addEventListener('click', () => {
   }
   backendUrl.value = backend;
   localStorage.setItem(BACKEND_KEY, backend);
-  showBackendStatus('Backend sauvegardé sur ce téléphone.', 'success');
+  showBackendStatus('Service sauvegardé sur ce téléphone.', 'success');
 });
 
 testBackendBtn.addEventListener('click', testBackendConnection);
@@ -61,6 +86,7 @@ testBackendBtn.addEventListener('click', testBackendConnection);
 mediaFile.addEventListener('change', () => {
   resetResult();
   resetSourcePreview();
+  hideUserStatus();
 
   const file = mediaFile.files && mediaFile.files[0] ? mediaFile.files[0] : null;
   if (!file) {
@@ -75,7 +101,7 @@ mediaFile.addEventListener('change', () => {
   fileInfo.textContent = `${typeLabel} : ${file.name} • ${sizeMb} MB`;
 
   if (file.size > MAX_FILE_SIZE) {
-    showBackendStatus('Fichier lourd. Pour la V1, prends moins de 80 MB.', 'warning');
+    showUserStatus('Fichier trop lourd pour la V1. Coupe une vidéo plus courte.', 'warning');
   }
 
   sourceObjectUrl = URL.createObjectURL(file);
@@ -93,19 +119,19 @@ dubBtn.addEventListener('click', createDub);
 async function testBackendConnection() {
   const backend = getBackendUrl();
   if (!backend) {
-    showBackendStatus('Ajoute ton URL Render ou ouvre l’app directement depuis Render.', 'error');
+    showBackendStatus('Aucun service configuré.', 'error');
     return;
   }
 
   try {
     testBackendBtn.disabled = true;
-    showBackendStatus('Test du backend...', 'loading');
+    showBackendStatus('Test du service...', 'loading');
     const response = await fetch(`${backend}/api/health`, { method: 'GET' });
     const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error('Réponse backend invalide');
-    showBackendStatus(`Backend connecté : ${data.app || 'ViralVoice'}`, 'success');
+    if (!response.ok || !data.ok) throw new Error('Réponse service invalide');
+    showBackendStatus(`Service connecté : ${data.app || 'ViralVoice'}`, 'success');
   } catch (error) {
-    showBackendStatus('Backend non joignable. Vérifie l’URL Render.', 'error');
+    showBackendStatus('Service non joignable. Vérifie l’URL Render.', 'error');
   } finally {
     testBackendBtn.disabled = false;
   }
@@ -115,18 +141,20 @@ async function createDub() {
   const file = mediaFile.files && mediaFile.files[0] ? mediaFile.files[0] : null;
   const backend = getBackendUrl();
 
+  hideUserStatus();
+
   if (!backend) {
-    showBackendStatus('Ajoute ton URL backend Render avant de lancer.', 'error');
+    showUserStatus('Service indisponible pour le moment.', 'error');
     return;
   }
 
   if (!file) {
-    showBackendStatus('Choisis une vidéo ou un audio.', 'error');
+    showUserStatus('Choisis une vidéo ou un audio.', 'error');
     return;
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    showBackendStatus('Fichier trop lourd pour la V1. Coupe une vidéo plus courte.', 'error');
+    showUserStatus('Fichier trop lourd pour la V1. Coupe une vidéo plus courte.', 'error');
     return;
   }
 
@@ -136,7 +164,7 @@ async function createDub() {
     resultCard.classList.add('hidden');
     dubBtn.disabled = true;
     dubBtn.textContent = 'Traitement en cours...';
-    statusText.textContent = 'Envoi du fichier au backend...';
+    statusText.textContent = 'Préparation du fichier...';
 
     const formData = new FormData();
     formData.append('media', file);
@@ -177,10 +205,10 @@ async function createDub() {
 
     resultCard.classList.remove('hidden');
     statusText.textContent = 'Terminé';
-    showBackendStatus('Doublage terminé.', 'success');
+    showUserStatus('Doublage terminé.', 'success');
   } catch (error) {
     console.error(error);
-    showBackendStatus(error.message || 'Erreur pendant le doublage.', 'error');
+    showUserStatus(error.message || 'Erreur pendant le doublage.', 'error');
   } finally {
     statusCard.classList.add('hidden');
     dubBtn.disabled = false;
@@ -207,7 +235,7 @@ function scheduleStatusMessages() {
 }
 
 function getBackendUrl() {
-  const manual = cleanBackendUrl(backendUrl.value || localStorage.getItem(BACKEND_KEY) || '');
+  const manual = cleanBackendUrl(backendUrl.value || localStorage.getItem(BACKEND_KEY) || DEFAULT_BACKEND_URL || '');
   if (manual) return manual;
 
   const host = window.location.hostname;
@@ -216,6 +244,11 @@ function getBackendUrl() {
   }
 
   return '';
+}
+
+function showAdminPanel() {
+  adminPanel.classList.remove('hidden');
+  adminPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function resetResult() {
@@ -263,6 +296,17 @@ function showBackendStatus(text, type = '') {
   backendStatus.textContent = text;
   backendStatus.className = 'notice';
   if (type) backendStatus.classList.add(type);
+}
+
+function showUserStatus(text, type = '') {
+  userStatus.textContent = text;
+  userStatus.className = 'notice user-status';
+  if (type) userStatus.classList.add(type);
+  userStatus.classList.remove('hidden');
+}
+
+function hideUserStatus() {
+  userStatus.classList.add('hidden');
 }
 
 async function readJsonResponse(response) {
