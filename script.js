@@ -38,13 +38,20 @@ const payInputs = {
   pro: document.getElementById('payPro')
 };
 
-const APP_VERSION = '20260508i';
+const APP_VERSION = '20260508j';
 const BACKEND_KEY = 'viralvoice-backend-url';
 const PAYMENT_LINKS_KEY = 'viralvoice-payment-links';
 const PAYMENT_REQUESTS_KEY = 'viralvoice-payment-requests';
 const CLIENT_NAME_KEY = 'viralvoice-client-name';
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
 const DEFAULT_BACKEND_URL = 'https://viralvoice.onrender.com';
+
+const DEFAULT_PAYMENT_LINKS = {
+  decouverte: 'https://checkout.revolut.com/pay/1f3ed21f-2b5a-428e-98ce-92195da91bc6',
+  createur: 'https://checkout.revolut.com/pay/664e7390-9e23-4772-beae-4cbe18ad228a',
+  viral: 'https://checkout.revolut.com/pay/9249340c-529d-4fd5-ae94-8f250a7db43c',
+  pro: 'https://checkout.revolut.com/pay/4ff81a0e-d5b1-41e5-8ece-1b9890bb1ac3'
+};
 
 const PLANS = {
   decouverte: { label: 'Découverte', minutes: 1, price: '1,99 €' },
@@ -190,9 +197,10 @@ function loadPaymentLinks() {
 
 function getPaymentLinks() {
   try {
-    return JSON.parse(localStorage.getItem(PAYMENT_LINKS_KEY) || '{}');
+    const saved = JSON.parse(localStorage.getItem(PAYMENT_LINKS_KEY) || '{}');
+    return { ...DEFAULT_PAYMENT_LINKS, ...saved };
   } catch {
-    return {};
+    return { ...DEFAULT_PAYMENT_LINKS };
   }
 }
 
