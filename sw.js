@@ -1,10 +1,10 @@
-const CACHE_NAME = 'viralvoice-v1';
+const CACHE_NAME = 'viralvoice-v20260508e';
 const ASSETS = [
   './',
   './index.html',
-  './style.css',
-  './script.js',
-  './manifest.json'
+  './style.css?v=20260508e',
+  './script.js?v=20260508e',
+  './manifest.json?v=20260508e'
 ];
 
 self.addEventListener('install', event => {
@@ -24,6 +24,6 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request).then(response => response || caches.match('./index.html')))
+    fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request).then(response => response || caches.match('./index.html')))
   );
 });
