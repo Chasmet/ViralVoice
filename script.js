@@ -27,7 +27,7 @@ const sourcePreview = document.getElementById('sourcePreview');
 const sourceAudioPreview = document.getElementById('sourceAudioPreview');
 const speakerInfo = document.getElementById('speakerInfo');
 
-const APP_VERSION = '20260508g';
+const APP_VERSION = '20260508h';
 const BACKEND_KEY = 'viralvoice-backend-url';
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
 const DEFAULT_BACKEND_URL = 'https://viralvoice.onrender.com';
@@ -40,19 +40,13 @@ let logoTapTimer = null;
 const sameOriginBackend = `${window.location.origin}`;
 backendUrl.value = localStorage.getItem(BACKEND_KEY) || DEFAULT_BACKEND_URL;
 
-if (location.hash === '#admin') {
-  showAdminPanel();
-}
-
+if (location.hash === '#admin') showAdminPanel();
 clearOldServiceWorkersAndCaches();
 
 adminLogoBtn.addEventListener('click', () => {
   logoTapCount += 1;
   clearTimeout(logoTapTimer);
-  logoTapTimer = setTimeout(() => {
-    logoTapCount = 0;
-  }, 1200);
-
+  logoTapTimer = setTimeout(() => { logoTapCount = 0; }, 1200);
   if (logoTapCount >= 7) {
     logoTapCount = 0;
     showAdminPanel();
@@ -60,13 +54,8 @@ adminLogoBtn.addEventListener('click', () => {
   }
 });
 
-voiceVolume.addEventListener('input', () => {
-  voiceVolumeValue.textContent = `${voiceVolume.value}%`;
-});
-
-originalVolume.addEventListener('input', () => {
-  originalVolumeValue.textContent = `${originalVolume.value}%`;
-});
+voiceVolume.addEventListener('input', () => { voiceVolumeValue.textContent = `${voiceVolume.value}%`; });
+originalVolume.addEventListener('input', () => { originalVolumeValue.textContent = `${originalVolume.value}%`; });
 
 saveBackendBtn.addEventListener('click', () => {
   const backend = cleanBackendUrl(backendUrl.value);
@@ -98,9 +87,7 @@ mediaFile.addEventListener('change', () => {
   const typeLabel = isVideo ? 'Vidéo' : 'Audio';
   fileInfo.textContent = `${typeLabel} : ${file.name} • ${sizeMb} MB`;
 
-  if (file.size > MAX_FILE_SIZE) {
-    showUserStatus('Fichier trop lourd pour la V1. Coupe une vidéo plus courte.', 'warning');
-  }
+  if (file.size > MAX_FILE_SIZE) showUserStatus('Fichier trop lourd pour la V1. Coupe une vidéo plus courte.', 'warning');
 
   sourceObjectUrl = URL.createObjectURL(file);
   if (isVideo) {
@@ -116,17 +103,13 @@ dubBtn.addEventListener('click', createDub);
 
 async function testBackendConnection() {
   const backend = getBackendUrl();
-
   try {
     testBackendBtn.disabled = true;
     showBackendStatus('Test du service...', 'loading');
-    const response = await fetch(`${backend}/api/health?version=${APP_VERSION}`, {
-      method: 'GET',
-      cache: 'no-store'
-    });
+    const response = await fetch(`${backend}/api/health?version=${APP_VERSION}`, { method: 'GET', cache: 'no-store' });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error('Réponse service invalide');
-    showBackendStatus(`Service connecté - OpenAI ${data.openaiKey ? 'OK' : 'manquant'} - Multi-voix ${data.assemblyAiKey ? 'OK' : 'non configuré'}`, 'success');
+    showBackendStatus(`Service connecté - OpenAI ${data.openaiKey ? 'OK' : 'manquant'} - Multi-voix OpenAI ${data.openAiDiarization ? 'OK' : 'non actif'}`, 'success');
   } catch (error) {
     showBackendStatus('Service Render non joignable. Vérifie que Render est bien réveillé.', 'error');
   } finally {
@@ -137,14 +120,12 @@ async function testBackendConnection() {
 async function createDub() {
   const file = mediaFile.files && mediaFile.files[0] ? mediaFile.files[0] : null;
   const backend = getBackendUrl();
-
   hideUserStatus();
 
   if (!file) {
     showUserStatus('Choisis une vidéo ou un audio.', 'error');
     return;
   }
-
   if (file.size > MAX_FILE_SIZE) {
     showUserStatus('Fichier trop lourd pour la V1. Coupe une vidéo plus courte.', 'error');
     return;
@@ -159,10 +140,8 @@ async function createDub() {
     statusText.textContent = 'Réveil du service Render...';
 
     const health = await pingBackend(backend);
-
-    statusText.textContent = multiVoiceMode.checked && health.assemblyAiKey
-      ? 'Préparation multi-voix automatique...'
-      : 'Préparation du doublage simple...';
+    const useMultiVoice = multiVoiceMode.checked && health.openAiDiarization;
+    statusText.textContent = useMultiVoice ? 'Préparation multi-voix OpenAI...' : 'Préparation du doublage simple...';
 
     const formData = new FormData();
     formData.append('media', file);
@@ -172,20 +151,15 @@ async function createDub() {
     formData.append('originalVolume', String(Number(originalVolume.value) / 100));
     formData.append('multiVoice', multiVoiceMode.checked ? 'true' : 'false');
 
-    scheduleStatusMessages(multiVoiceMode.checked && health.assemblyAiKey);
+    scheduleStatusMessages(useMultiVoice);
 
-    const response = await fetch(`${backend}/api/dub-video`, {
-      method: 'POST',
-      body: formData,
-      cache: 'no-store'
-    });
-
+    const response = await fetch(`${backend}/api/dub-video`, { method: 'POST', body: formData, cache: 'no-store' });
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || 'Erreur serveur');
 
     outputText.value = data.translation || '';
     speakerInfo.textContent = data.multiVoiceUsed
-      ? `Multi-voix auto activé : ${data.speakersDetected || 1} locuteur(s) détecté(s).`
+      ? `Multi-voix OpenAI activé : ${data.speakersDetected || 1} locuteur(s) détecté(s).`
       : 'Doublage simple : une voix IA utilisée.';
 
     if (data.dubbedVideoUrl) {
@@ -220,10 +194,7 @@ async function createDub() {
 }
 
 async function pingBackend(backend) {
-  const response = await fetch(`${backend}/api/health?version=${APP_VERSION}`, {
-    method: 'GET',
-    cache: 'no-store'
-  });
+  const response = await fetch(`${backend}/api/health?version=${APP_VERSION}`, { method: 'GET', cache: 'no-store' });
   const data = await response.json();
   if (!response.ok || !data.ok) throw new Error('Service Render indisponible. Réessaie dans 30 secondes.');
   if (!data.openaiKey) throw new Error('Clé OpenAI manquante dans Render. Ajoute OPENAI_API_KEY.');
@@ -231,55 +202,27 @@ async function pingBackend(backend) {
 }
 
 function scheduleStatusMessages(isMultiVoice) {
-  setTimeout(() => {
-    if (!statusCard.classList.contains('hidden')) statusText.textContent = isMultiVoice ? 'Détection automatique des locuteurs...' : 'Transcription de la voix originale...';
-  }, 2500);
-
-  setTimeout(() => {
-    if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Traduction du texte...';
-  }, 9000);
-
-  setTimeout(() => {
-    if (!statusCard.classList.contains('hidden')) statusText.textContent = isMultiVoice ? 'Création des voix IA par personnage...' : 'Création de la voix IA...';
-  }, 15000);
-
-  setTimeout(() => {
-    if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Préparation du fichier final...';
-  }, 23000);
+  setTimeout(() => { if (!statusCard.classList.contains('hidden')) statusText.textContent = isMultiVoice ? 'OpenAI détecte automatiquement les locuteurs...' : 'Transcription de la voix originale...'; }, 2500);
+  setTimeout(() => { if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Traduction du texte...'; }, 9000);
+  setTimeout(() => { if (!statusCard.classList.contains('hidden')) statusText.textContent = isMultiVoice ? 'Création des voix IA par personnage...' : 'Création de la voix IA...'; }, 15000);
+  setTimeout(() => { if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Préparation du fichier final...'; }, 23000);
 }
 
 function getBackendUrl() {
   const manual = cleanBackendUrl(backendUrl.value || localStorage.getItem(BACKEND_KEY) || '');
   if (manual) return manual;
-
   const host = window.location.hostname;
   if (host.includes('onrender.com') || host === 'localhost' || host === '127.0.0.1') return sameOriginBackend;
-
   return DEFAULT_BACKEND_URL;
 }
 
-function showAdminPanel() {
-  adminPanel.classList.remove('hidden');
-  adminPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
+function showAdminPanel() { adminPanel.classList.remove('hidden'); adminPanel.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 
 function resetResult() {
-  finalVideo.pause();
-  finalVideo.removeAttribute('src');
-  finalVideo.load();
-  finalVideo.classList.add('hidden');
-
-  finalAudio.pause();
-  finalAudio.removeAttribute('src');
-  finalAudio.load();
-  finalAudio.classList.add('hidden');
-
-  downloadVideoBtn.removeAttribute('href');
-  downloadVideoBtn.classList.add('hidden');
-
-  downloadAudioBtn.removeAttribute('href');
-  downloadAudioBtn.classList.add('hidden');
-
+  finalVideo.pause(); finalVideo.removeAttribute('src'); finalVideo.load(); finalVideo.classList.add('hidden');
+  finalAudio.pause(); finalAudio.removeAttribute('src'); finalAudio.load(); finalAudio.classList.add('hidden');
+  downloadVideoBtn.removeAttribute('href'); downloadVideoBtn.classList.add('hidden');
+  downloadAudioBtn.removeAttribute('href'); downloadAudioBtn.classList.add('hidden');
   outputText.value = '';
   speakerInfo.textContent = 'Voix générée par IA.';
   currentResultUrls.forEach(url => URL.revokeObjectURL(url));
@@ -289,14 +232,8 @@ function resetResult() {
 function resetSourcePreview() {
   if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
   sourceObjectUrl = null;
-  sourcePreview.pause();
-  sourcePreview.removeAttribute('src');
-  sourcePreview.load();
-  sourcePreview.classList.add('hidden');
-  sourceAudioPreview.pause();
-  sourceAudioPreview.removeAttribute('src');
-  sourceAudioPreview.load();
-  sourceAudioPreview.classList.add('hidden');
+  sourcePreview.pause(); sourcePreview.removeAttribute('src'); sourcePreview.load(); sourcePreview.classList.add('hidden');
+  sourceAudioPreview.pause(); sourceAudioPreview.removeAttribute('src'); sourceAudioPreview.load(); sourceAudioPreview.classList.add('hidden');
 }
 
 function cleanBackendUrl(url) {
@@ -305,30 +242,13 @@ function cleanBackendUrl(url) {
   return clean.startsWith('https://') || clean.startsWith('http://localhost') ? clean : '';
 }
 
-function showBackendStatus(text, type = '') {
-  backendStatus.textContent = text;
-  backendStatus.className = 'notice';
-  if (type) backendStatus.classList.add(type);
-}
-
-function showUserStatus(text, type = '') {
-  userStatus.textContent = text;
-  userStatus.className = 'notice user-status';
-  if (type) userStatus.classList.add(type);
-  userStatus.classList.remove('hidden');
-}
-
-function hideUserStatus() {
-  userStatus.classList.add('hidden');
-}
+function showBackendStatus(text, type = '') { backendStatus.textContent = text; backendStatus.className = 'notice'; if (type) backendStatus.classList.add(type); }
+function showUserStatus(text, type = '') { userStatus.textContent = text; userStatus.className = 'notice user-status'; if (type) userStatus.classList.add(type); userStatus.classList.remove('hidden'); }
+function hideUserStatus() { userStatus.classList.add('hidden'); }
 
 async function readJsonResponse(response) {
   const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    return { error: text || 'Réponse serveur illisible' };
-  }
+  try { return JSON.parse(text); } catch { return { error: text || 'Réponse serveur illisible' }; }
 }
 
 function absoluteUrl(backend, url) {
