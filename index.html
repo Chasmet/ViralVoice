@@ -7,12 +7,12 @@
   <meta name="description" content="ViralVoice transforme une vidéo ou un audio en doublage IA traduit avec OpenAI." />
   <title>ViralVoice - Doublage vidéo IA</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=20260508" />
+  <link rel="stylesheet" href="style.css?v=20260508b" />
 </head>
 <body>
   <main class="app">
     <section class="hero">
-      <div class="logo">VV</div>
+      <button id="adminLogoBtn" class="logo" type="button" aria-label="ViralVoice">VV</button>
       <p class="eyebrow">Doublage vidéo IA</p>
       <h1>Ta vidéo parle toutes les langues.</h1>
       <p class="subtitle">
@@ -55,10 +55,10 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>Connexion au backend</h2>
+    <section id="adminPanel" class="card admin-panel hidden">
+      <h2>Réglage admin</h2>
       <p class="hint">
-        Sur GitHub Pages, colle l’URL Render de ViralVoice. Sur Render, l’application utilise automatiquement son propre backend.
+        Cette zone est cachée aux utilisateurs. Elle sert uniquement à configurer ton backend.
       </p>
       <label for="backendUrl">URL backend Render</label>
       <input id="backendUrl" type="url" placeholder="https://ton-backend.onrender.com" autocomplete="off" />
@@ -66,7 +66,7 @@
         <button id="saveBackendBtn" class="secondary" type="button">Sauvegarder</button>
         <button id="testBackendBtn" class="secondary" type="button">Tester</button>
       </div>
-      <div id="backendStatus" class="notice">Backend en attente.</div>
+      <div id="backendStatus" class="notice">Service en attente.</div>
     </section>
 
     <section class="card">
@@ -129,6 +129,8 @@
       <p id="statusText">Traitement en cours...</p>
     </section>
 
+    <div id="userStatus" class="notice user-status hidden">Service en attente.</div>
+
     <section id="resultCard" class="card hidden">
       <h2>Résultat</h2>
       <p class="hint">Voix générée par IA. Pour une vraie synchronisation labiale, il faudra brancher ensuite Sync30 ou un moteur lip-sync.</p>
@@ -151,6 +153,6 @@
     </section>
   </main>
 
-  <script src="script.js?v=20260508"></script>
+  <script src="script.js?v=20260508b"></script>
 </body>
 </html>
