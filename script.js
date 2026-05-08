@@ -10,6 +10,7 @@ const backendStatus = document.getElementById('backendStatus');
 const userStatus = document.getElementById('userStatus');
 const targetLang = document.getElementById('targetLang');
 const voiceMode = document.getElementById('voiceMode');
+const multiVoiceMode = document.getElementById('multiVoiceMode');
 const voiceVolume = document.getElementById('voiceVolume');
 const voiceVolumeValue = document.getElementById('voiceVolumeValue');
 const originalVolume = document.getElementById('originalVolume');
@@ -24,8 +25,9 @@ const downloadVideoBtn = document.getElementById('downloadVideoBtn');
 const downloadAudioBtn = document.getElementById('downloadAudioBtn');
 const sourcePreview = document.getElementById('sourcePreview');
 const sourceAudioPreview = document.getElementById('sourceAudioPreview');
+const speakerInfo = document.getElementById('speakerInfo');
 
-const APP_VERSION = '20260508f';
+const APP_VERSION = '20260508g';
 const BACKEND_KEY = 'viralvoice-backend-url';
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
 const DEFAULT_BACKEND_URL = 'https://viralvoice.onrender.com';
@@ -36,8 +38,7 @@ let logoTapCount = 0;
 let logoTapTimer = null;
 
 const sameOriginBackend = `${window.location.origin}`;
-backendUrl.value = DEFAULT_BACKEND_URL;
-localStorage.setItem(BACKEND_KEY, DEFAULT_BACKEND_URL);
+backendUrl.value = localStorage.getItem(BACKEND_KEY) || DEFAULT_BACKEND_URL;
 
 if (location.hash === '#admin') {
   showAdminPanel();
@@ -125,7 +126,7 @@ async function testBackendConnection() {
     });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error('Réponse service invalide');
-    showBackendStatus(`Service connecté : ${data.app || 'ViralVoice'} - clé OpenAI ${data.openaiKey ? 'OK' : 'manquante'}`, 'success');
+    showBackendStatus(`Service connecté - OpenAI ${data.openaiKey ? 'OK' : 'manquant'} - Multi-voix ${data.assemblyAiKey ? 'OK' : 'non configuré'}`, 'success');
   } catch (error) {
     showBackendStatus('Service Render non joignable. Vérifie que Render est bien réveillé.', 'error');
   } finally {
@@ -157,9 +158,11 @@ async function createDub() {
     dubBtn.textContent = 'Traitement en cours...';
     statusText.textContent = 'Réveil du service Render...';
 
-    await pingBackend(backend);
+    const health = await pingBackend(backend);
 
-    statusText.textContent = 'Préparation du fichier...';
+    statusText.textContent = multiVoiceMode.checked && health.assemblyAiKey
+      ? 'Préparation multi-voix automatique...'
+      : 'Préparation du doublage simple...';
 
     const formData = new FormData();
     formData.append('media', file);
@@ -167,8 +170,9 @@ async function createDub() {
     formData.append('voice', voiceMode.value);
     formData.append('voiceVolume', String(Number(voiceVolume.value) / 100));
     formData.append('originalVolume', String(Number(originalVolume.value) / 100));
+    formData.append('multiVoice', multiVoiceMode.checked ? 'true' : 'false');
 
-    scheduleStatusMessages();
+    scheduleStatusMessages(multiVoiceMode.checked && health.assemblyAiKey);
 
     const response = await fetch(`${backend}/api/dub-video`, {
       method: 'POST',
@@ -180,6 +184,9 @@ async function createDub() {
     if (!response.ok) throw new Error(data.error || 'Erreur serveur');
 
     outputText.value = data.translation || '';
+    speakerInfo.textContent = data.multiVoiceUsed
+      ? `Multi-voix auto activé : ${data.speakersDetected || 1} locuteur(s) détecté(s).`
+      : 'Doublage simple : une voix IA utilisée.';
 
     if (data.dubbedVideoUrl) {
       const videoUrl = absoluteUrl(backend, data.dubbedVideoUrl);
@@ -223,27 +230,27 @@ async function pingBackend(backend) {
   return data;
 }
 
-function scheduleStatusMessages() {
+function scheduleStatusMessages(isMultiVoice) {
   setTimeout(() => {
-    if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Transcription de la voix originale...';
+    if (!statusCard.classList.contains('hidden')) statusText.textContent = isMultiVoice ? 'Détection automatique des locuteurs...' : 'Transcription de la voix originale...';
   }, 2500);
 
   setTimeout(() => {
     if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Traduction du texte...';
-  }, 7000);
+  }, 9000);
 
   setTimeout(() => {
-    if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Création de la voix IA...';
-  }, 12000);
+    if (!statusCard.classList.contains('hidden')) statusText.textContent = isMultiVoice ? 'Création des voix IA par personnage...' : 'Création de la voix IA...';
+  }, 15000);
 
   setTimeout(() => {
     if (!statusCard.classList.contains('hidden')) statusText.textContent = 'Préparation du fichier final...';
-  }, 18000);
+  }, 23000);
 }
 
 function getBackendUrl() {
   const manual = cleanBackendUrl(backendUrl.value || localStorage.getItem(BACKEND_KEY) || '');
-  if (manual && manual.includes('viralvoice.onrender.com')) return manual;
+  if (manual) return manual;
 
   const host = window.location.hostname;
   if (host.includes('onrender.com') || host === 'localhost' || host === '127.0.0.1') return sameOriginBackend;
@@ -274,6 +281,7 @@ function resetResult() {
   downloadAudioBtn.classList.add('hidden');
 
   outputText.value = '';
+  speakerInfo.textContent = 'Voix générée par IA.';
   currentResultUrls.forEach(url => URL.revokeObjectURL(url));
   currentResultUrls = [];
 }
