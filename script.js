@@ -27,7 +27,7 @@ const sourceAudioPreview = document.getElementById('sourceAudioPreview');
 
 const BACKEND_KEY = 'viralvoice-backend-url';
 const MAX_FILE_SIZE = 80 * 1024 * 1024;
-const DEFAULT_BACKEND_URL = '';
+const DEFAULT_BACKEND_URL = 'https://viralvoice.onrender.com';
 
 let sourceObjectUrl = null;
 let currentResultUrls = [];
@@ -131,7 +131,7 @@ async function testBackendConnection() {
     if (!response.ok || !data.ok) throw new Error('Réponse service invalide');
     showBackendStatus(`Service connecté : ${data.app || 'ViralVoice'}`, 'success');
   } catch (error) {
-    showBackendStatus('Service non joignable. Vérifie l’URL Render.', 'error');
+    showBackendStatus('Service non joignable. Vérifie le service Render.', 'error');
   } finally {
     testBackendBtn.disabled = false;
   }
