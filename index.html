@@ -10,20 +10,20 @@
 
   <title>ViralVoice - Doublage vidéo IA</title>
 
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-512.png?v=20260508logo7" />
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=20260508logo7" />
-  <link rel="apple-touch-icon" href="icon-512.png?v=20260508logo7" />
-  <link rel="manifest" href="manifest.json?v=20260508logo7" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-512.png?v=20260615v120" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=20260615v120" />
+  <link rel="apple-touch-icon" href="icon-512.png?v=20260615v120" />
+  <link rel="manifest" href="manifest.json?v=20260615v120" />
 
-  <link rel="stylesheet" href="style.css?v=20260508logo7" />
-  <link rel="stylesheet" href="premium-ui.css?v=20260508logo7" />
+  <link rel="stylesheet" href="style.css?v=20260615v120" />
+  <link rel="stylesheet" href="premium-ui.css?v=20260615v120" />
 </head>
 
 <body>
   <main class="app">
     <section class="hero">
       <button id="adminLogoBtn" class="logo" type="button" aria-label="ViralVoice">
-        <img src="icon-512.png?v=20260508logo7" alt="ViralVoice" class="app-logo-img" />
+        <img src="icon-512.png?v=20260615v120" alt="ViralVoice" class="app-logo-img" />
       </button>
       <p class="eyebrow">Doublage vidéo IA</p>
       <h1>Ta vidéo parle toutes les langues.</h1>
@@ -33,13 +33,13 @@
     <section class="card account-card">
       <div class="section-title">
         <h2>Mon compte</h2>
-        <span id="walletBadge" class="badge muted-badge">0 crédit</span>
+        <span id="walletBadge" class="badge muted-badge">0 min</span>
       </div>
       <label for="clientEmail">Email client</label>
       <input id="clientEmail" type="email" placeholder="exemple@email.com" autocomplete="email" />
-      <p class="hint">Utilise le même email après paiement pour retrouver tes crédits.</p>
+      <p class="hint">Utilise le même email après paiement pour retrouver tes minutes.</p>
       <div class="actions two">
-        <button id="checkWalletBtn" class="secondary" type="button">Vérifier mes crédits</button>
+        <button id="checkWalletBtn" class="secondary" type="button">Vérifier mes minutes</button>
         <button id="clearClientBtn" class="secondary" type="button">Changer de compte</button>
       </div>
       <div id="walletStatus" class="notice hidden">Solde en attente.</div>
@@ -47,15 +47,15 @@
 
     <section class="card prices">
       <div class="section-title">
-        <h2>Acheter des crédits</h2>
+        <h2>Acheter des minutes</h2>
         <span class="badge">Revolut</span>
       </div>
-      <p class="hint">1 crédit = 1 doublage vidéo ou audio jusqu'à 60 secondes.</p>
+      <p class="hint">Tes minutes sont consommées selon la durée du fichier. Durée maximale par doublage : 120 secondes.</p>
       <div class="plans">
-        <article class="plan"><h3>Découverte</h3><strong>1,99 €</strong><p>1 crédit</p><button class="buy-btn" type="button" data-plan="decouverte">Acheter</button></article>
-        <article class="plan"><h3>Créateur</h3><strong>6,99 €</strong><p>5 crédits</p><button class="buy-btn" type="button" data-plan="createur">Acheter</button></article>
-        <article class="plan featured"><span>Populaire</span><h3>Viral</h3><strong>11,99 €</strong><p>10 crédits</p><button class="buy-btn" type="button" data-plan="viral">Acheter</button></article>
-        <article class="plan"><h3>Pro</h3><strong>29,99 €</strong><p>30 crédits</p><button class="buy-btn" type="button" data-plan="pro">Acheter</button></article>
+        <article class="plan"><h3>Découverte</h3><strong>1,99 €</strong><p>5 minutes</p><button class="buy-btn" type="button" data-plan="decouverte">Acheter</button></article>
+        <article class="plan"><h3>Créateur</h3><strong>6,99 €</strong><p>30 minutes</p><button class="buy-btn" type="button" data-plan="createur">Acheter</button></article>
+        <article class="plan featured"><span>Populaire</span><h3>Viral</h3><strong>11,99 €</strong><p>60 minutes</p><button class="buy-btn" type="button" data-plan="viral">Acheter</button></article>
+        <article class="plan"><h3>Pro</h3><strong>29,99 €</strong><p>180 minutes</p><button class="buy-btn" type="button" data-plan="pro">Acheter</button></article>
       </div>
       <div id="paymentStatus" class="notice hidden">Paiement en attente.</div>
     </section>
@@ -64,22 +64,22 @@
       <h2>Réglage admin</h2>
       <p class="hint">Zone cachée. Réservée au propriétaire de ViralVoice.</p>
       <h3 class="admin-subtitle">Mode admin gratuit</h3>
-      <label class="switch-row" for="adminFreeMode"><input id="adminFreeMode" type="checkbox" /><span><strong>Activer mes générations gratuites</strong><small>Quand ce mode est actif, tes doublages ne consomment aucun crédit.</small></span></label>
+      <label class="switch-row" for="adminFreeMode"><input id="adminFreeMode" type="checkbox" /><span><strong>Activer mes générations gratuites</strong><small>Quand ce mode est actif, tes doublages sont illimités et ne consomment aucune minute.</small></span></label>
       <label for="adminSecretInput">Mot de passe admin Render</label>
       <input id="adminSecretInput" type="password" placeholder="ADMIN_SECRET" autocomplete="off" />
       <button id="saveAdminSecretBtn" class="secondary full" type="button">Sauvegarder le mode admin</button>
       <div id="adminFreeStatus" class="notice hidden">Mode admin en attente.</div>
 
-      <h3 class="admin-subtitle">Ajouter des crédits à un client</h3>
+      <h3 class="admin-subtitle">Ajouter des minutes à un client</h3>
       <label for="adminClientEmail">Email client à créditer</label>
       <input id="adminClientEmail" type="email" placeholder="client@email.com" autocomplete="off" />
-      <label for="adminTokens">Nombre de crédits</label>
+      <label for="adminTokens">Nombre de minutes</label>
       <input id="adminTokens" type="number" min="1" value="1" />
       <label for="adminPackName">Nom du pack</label>
       <input id="adminPackName" type="text" value="Ajout manuel" />
       <label for="adminAmountEur">Montant payé</label>
       <input id="adminAmountEur" type="number" min="0" step="0.01" value="0" />
-      <button id="adminAddTokensBtn" class="primary admin-primary" type="button">Ajouter les crédits</button>
+      <button id="adminAddTokensBtn" class="primary admin-primary" type="button">Ajouter les minutes</button>
       <div id="adminAddTokensStatus" class="notice hidden">Ajout en attente.</div>
 
       <h3 class="admin-subtitle">Backend Render</h3>
@@ -100,7 +100,7 @@
 
     <section class="card">
       <h2>1. Vidéo ou audio à doubler</h2>
-      <label class="file-zone" for="mediaFile"><span class="file-icon">🎬</span><strong>Choisir une vidéo ou un audio</strong><small>MP4, MOV, WEBM, MP3, WAV, M4A - fichier court conseillé</small></label>
+      <label class="file-zone" for="mediaFile"><span class="file-icon">🎬</span><strong>Choisir une vidéo ou un audio</strong><small>MP4, MOV, WEBM, MP3, WAV, M4A - maximum 120 secondes</small></label>
       <input id="mediaFile" type="file" accept="video/*,audio/*,.mp4,.mov,.webm,.mp3,.wav,.m4a" hidden />
       <div id="fileInfo" class="file-info">Aucun fichier sélectionné</div>
       <video id="sourcePreview" controls playsinline class="media-preview hidden"></video>
@@ -152,11 +152,11 @@
       <textarea id="outputText" readonly></textarea>
     </section>
 
-    <section class="card warning"><h2>Limite actuelle</h2><p>Cette version traduit et double la voix. Elle ne modifie pas encore parfaitement les lèvres du personnage.</p></section>
+    <section class="card warning"><h2>Limite actuelle</h2><p>Cette version traduit et double la voix jusqu’à 120 secondes par fichier. Elle ne modifie pas encore parfaitement les lèvres du personnage.</p></section>
   </main>
 
-  <script src="script.js?v=20260508logo7"></script>
-  <script src="audio-presets.js?v=20260508logo7"></script>
-  <script src="admin-access.js?v=20260508logo7"></script>
+  <script src="script.js?v=20260615v120"></script>
+  <script src="audio-presets.js?v=20260615v120"></script>
+  <script src="admin-access.js?v=20260615v120"></script>
 </body>
 </html>
