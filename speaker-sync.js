@@ -1,9 +1,11 @@
 (() => {
   const nativeFetch = window.fetch.bind(window);
-  const VERSION = '20260730v310';
+  const VERSION = '20260730v320';
+  const autoDownloadedUrls = new Set();
   let lastLipSyncHealth = null;
 
   injectLipSyncControls();
+  refreshVisibleLimits();
 
   window.fetch = async (input, init = {}) => {
     const url = String(input || '');
@@ -48,7 +50,10 @@
     }
 
     if (url.includes('/api/dub-video') && response.ok) {
-      response.clone().json().then(updateResultLabel).catch(() => {});
+      response.clone().json().then(data => {
+        updateResultLabel(data);
+        startAutomaticVideoDownload(data, url);
+      }).catch(() => {});
     }
 
     return response;
@@ -120,6 +125,20 @@
     if (mixTitle) mixTitle.textContent = '6. Mixage audio';
   }
 
+  function refreshVisibleLimits() {
+    const hints = [...document.querySelectorAll('.hint, .file-zone small')];
+    hints.forEach(node => {
+      node.textContent = node.textContent
+        .replace('Durée maximale par doublage : 120 secondes.', 'Durée maximale par doublage : 5 minutes.')
+        .replace('maximum 120 secondes', 'maximum 5 minutes');
+    });
+
+    const warning = document.querySelector('section.card.warning p');
+    if (warning) {
+      warning.textContent = 'Le mode MuseTalk modifie réellement la bouche et traite les vidéos jusqu’à 5 minutes par blocs GPU.';
+    }
+  }
+
   function updateLipSyncHealth(data) {
     lastLipSyncHealth = data;
     const badge = document.getElementById('lipSyncBadge');
@@ -148,10 +167,48 @@
     const speakerInfo = document.getElementById('speakerInfo');
     if (!speakerInfo) return;
     if (data.lipSyncUsed) {
-      speakerInfo.textContent = `Vrai lip-sync MuseTalk terminé · ${data.speakersDetected || 1} intervenant(s) · ${data.synchronizedSegments || 0} segment(s).`;
+      speakerInfo.textContent = `Vrai lip-sync MuseTalk terminé · ${data.speakersDetected || 1} intervenant(s) · ${data.synchronizedSegments || 0} segment(s). Téléchargement automatique en cours.`;
     } else if (data.lipSyncRequested) {
       speakerInfo.textContent = `Lip-sync non appliqué : ${data.lipSyncWarning || 'erreur inconnue'}`;
+    } else if (data.dubbedVideoUrl) {
+      speakerInfo.textContent = 'Vidéo doublée terminée. Téléchargement automatique en cours.';
     }
+  }
+
+  function startAutomaticVideoDownload(data, requestUrl) {
+    if (!data || !data.dubbedVideoUrl) return;
+
+    let videoUrl;
+    try {
+      videoUrl = new URL(data.dubbedVideoUrl, requestUrl).toString();
+    } catch {
+      return;
+    }
+
+    if (!videoUrl.startsWith('https://') || autoDownloadedUrls.has(videoUrl)) return;
+    autoDownloadedUrls.add(videoUrl);
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = data.lipSyncUsed
+      ? `ViralVoice-LipSync-${timestamp}.mp4`
+      : `ViralVoice-Doublee-${timestamp}.mp4`;
+
+    try {
+      if (window.ViralVoiceAndroid && typeof window.ViralVoiceAndroid.download === 'function') {
+        window.ViralVoiceAndroid.download(videoUrl, fileName, 'video/mp4');
+        return;
+      }
+    } catch (error) {
+      console.warn('Pont Android indisponible', error);
+    }
+
+    const link = document.createElement('a');
+    link.href = videoUrl;
+    link.download = fileName;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => link.remove(), 1000);
   }
 
   window.VIRALVOICE_LIPSYNC_VERSION = VERSION;
