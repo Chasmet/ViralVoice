@@ -282,7 +282,8 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
               outputPath: lipSyncVideoPath,
               quality: options.lipSyncQuality,
               bboxShift: options.lipSyncBboxShift,
-              extraMargin: options.lipSyncExtraMargin
+              extraMargin: options.lipSyncExtraMargin,
+              originalVolume: options.originalVolume
             });
             payload.lipSyncUsed = true;
             payload.lipSyncEngine = 'musetalk-v1.5';
