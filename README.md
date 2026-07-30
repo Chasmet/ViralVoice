@@ -1,75 +1,74 @@
-# ViralVoice
+# ViralVoice 2.0
 
-ViralVoice est une application mobile-first pour créer un doublage IA à partir d’une vidéo ou d’un audio.
+ViralVoice est une application mobile-first de doublage IA pour vidéo et audio.
 
-## Ce que fait la V1
+## Correction principale de la V2
 
-- Upload vidéo ou audio depuis téléphone
-- Transcription de la voix originale
-- Traduction dans la langue choisie
-- Génération d’une nouvelle voix IA
-- Export audio doublé
-- Export vidéo doublée si le fichier source est une vidéo
-- Voix originale baissée en fond
-- Limite actuelle : 120 secondes maximum par fichier
-- Solde client affiché en minutes
+L’ancienne version transcrivait toute la conversation en un seul texte, générait une seule piste TTS à partir de 0 seconde et ignorait le paramètre `multiVoice`. Cela provoquait un décalage progressif et mélangeait les interventions homme/femme.
 
-## Ce que fait le backend
+La V2 :
 
-- Vérifie la durée du fichier avec FFmpeg
-- Refuse les fichiers de plus de 120 secondes par défaut
-- Déduit les minutes selon la durée réelle du fichier : 1 à 60 s = 1 minute, 61 à 120 s = 2 minutes
-- Rembourse automatiquement les minutes si le doublage échoue après débit
-- Garde le mode admin gratuit avec `ADMIN_SECRET`
+- détecte les changements d’intervenant avec la diarisation ;
+- conserve les horodatages de début et de fin de chaque réplique ;
+- traduit les segments sans changer leur ordre ;
+- attribue une voix distincte au premier et au deuxième intervenant ;
+- ajuste la durée de chaque réplique à son créneau ;
+- replace chaque segment vocal à son horodatage d’origine ;
+- mélange ensuite la piste doublée avec l’ambiance originale.
 
-## Limite claire
+Le premier intervenant est considéré comme un homme par défaut. L’interface permet de choisir « Femme » lorsque la vidéo commence par une femme.
 
-La V1 ne fait pas encore de synchronisation labiale parfaite. Pour ça, il faudra brancher ensuite Sync30 ou un moteur lip-sync.
+## Limite restante
 
-## Déploiement Render
+Cette synchronisation est une synchronisation temporelle des dialogues. Le mouvement exact des lèvres nécessite un moteur vidéo de lip-sync spécialisé.
 
-1. Crée un nouveau Web Service sur Render
-2. Connecte le dépôt GitHub `Chasmet/ViralVoice`
-3. Mets ces paramètres :
-   - Build Command : `npm install`
-   - Start Command : `npm start`
-4. Ajoute les variables d’environnement :
-   - `OPENAI_API_KEY` = ta clé API OpenAI
-   - `SUPABASE_URL` = URL du projet Supabase
-   - `SUPABASE_SERVICE_ROLE_KEY` = clé service role Supabase
-   - `ADMIN_SECRET` = mot de passe admin privé
-5. Déploie
-6. Ouvre l’URL Render
-7. Clique sur Tester dans l’application
+## Backend Render
 
-## Utilisation depuis GitHub Pages
+Variables obligatoires :
 
-1. Ouvre l’application GitHub Pages
-2. Colle l’URL Render dans le champ Backend
-3. Clique sur Sauvegarder
-4. Clique sur Tester
-5. Choisis une vidéo ou un audio
-6. Choisis la langue
-7. Clique sur Créer le doublage
+- `OPENAI_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `ADMIN_SECRET`
 
-## Fichiers
+Variables optionnelles :
 
-- `index.html` : interface mobile
-- `style.css` : design mobile
-- `premium-ui.css` : surcouche visuelle premium
-- `script.js` : logique côté téléphone
-- `audio-presets.js` : préréglages audio
-- `admin-access.js` : accès admin et libellés minutes
-- `server.js` : backend Render avec OpenAI, Supabase et FFmpeg
-- `package.json` : dépendances Render
-- `manifest.json` : installation mobile
-- `sw.js` : cache simple PWA
+- `OPENAI_TRANSCRIBE_MODEL` : `gpt-4o-mini-transcribe`
+- `OPENAI_DIARIZE_MODEL` : `gpt-4o-transcribe-diarize`
+- `OPENAI_TEXT_MODEL` : `gpt-4o-mini`
+- `OPENAI_TTS_MODEL` : `gpt-4o-mini-tts`
+- `MAX_FILE_SIZE` : 80 MB par défaut
+- `MAX_DURATION_SECONDS` : 120 secondes par défaut
+- `MAX_SYNC_SEGMENTS` : 60 par défaut
+- `CLEANUP_AFTER_MS` : 30 minutes par défaut
 
-## Variables optionnelles Render
+Build Command :
 
-- `OPENAI_TRANSCRIBE_MODEL` : par défaut `gpt-4o-mini-transcribe`
-- `OPENAI_TEXT_MODEL` : par défaut `gpt-4o-mini`
-- `OPENAI_TTS_MODEL` : par défaut `gpt-4o-mini-tts`
-- `MAX_FILE_SIZE` : par défaut 80 MB
-- `MAX_DURATION_SECONDS` : par défaut 120
-- `CLEANUP_AFTER_MS` : par défaut 30 minutes
+```bash
+npm install
+```
+
+Start Command :
+
+```bash
+npm start
+```
+
+Vérification JavaScript :
+
+```bash
+npm run check
+```
+
+## Application Android
+
+Le dossier `android/` contient une application Android native Java qui ouvre ViralVoice dans une WebView sécurisée et gère :
+
+- la sélection de vidéos et d’audios depuis le téléphone ;
+- les liens de paiement externes ;
+- le téléchargement des vidéos et audios générés ;
+- le bouton Retour Android.
+
+Configuration : Java, minSdk 21, compileSdk 34, targetSdk 34.
+
+Le workflow `.github/workflows/android-apk.yml` compile un véritable APK avec Gradle et le publie dans les Artifacts GitHub sous le nom `ViralVoice-Android-APK`.
