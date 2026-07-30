@@ -15,7 +15,7 @@ on:
       - '.github/workflows/android-apk.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -36,20 +36,68 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Generate Gradle wrapper
-        run: gradle -p android wrapper --gradle-version 8.7
-
       - name: Build debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --stacktrace
+        id: build
+        shell: bash
+        run: |
+          set +e
+          {
+            gradle -p android wrapper --gradle-version 8.7
+            cd android
+            ./gradlew assembleDebug --stacktrace
+          } 2>&1 | tee gradle-build.log
+          result=${PIPESTATUS[0]}
+          echo "result=${result}" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk ViralVoice-debug.apk
+      - name: Prepare build result
+        shell: bash
+        run: |
+          if [ "${{ steps.build.outputs.result }}" = "0" ] && \
+             [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk ViralVoice-debug.apk
+            status="success"
+          else
+            status="failed"
+          fi
+
+          {
+            echo "status=${status}"
+            echo "commit=${GITHUB_SHA}"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "workflow_run=${GITHUB_RUN_ID}"
+            echo "generated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > build-status.txt
 
       - name: Upload APK artifact
+        if: steps.build.outputs.result == '0'
         uses: actions/upload-artifact@v4
         with:
           name: ViralVoice-Android-APK
           path: ViralVoice-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish latest APK and logs
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          mkdir -p /tmp/viralvoice-apk
+          cp build-status.txt gradle-build.log /tmp/viralvoice-apk/
+          if [ -f ViralVoice-debug.apk ]; then
+            cp ViralVoice-debug.apk /tmp/viralvoice-apk/
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan apk-builds
+          git rm -rf .
+          git clean -fdx
+          cp /tmp/viralvoice-apk/* .
+          git add .
+          git commit -m "Publish ViralVoice Android APK ${GITHUB_SHA}"
+          git push --force origin HEAD:apk-builds
+
+      - name: Mark failed build
+        if: steps.build.outputs.result != '0'
+        run: exit 1
