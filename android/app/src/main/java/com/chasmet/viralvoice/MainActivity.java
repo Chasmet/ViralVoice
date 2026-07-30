@@ -13,6 +13,7 @@ import android.os.Message;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
+import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -26,11 +27,12 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
     private static final int FILE_CHOOSER_REQUEST = 1001;
-    private static final String APP_URL = "https://chasmet.github.io/ViralVoice/";
+    private static final String APP_URL = "https://chasmet.github.io/ViralVoice/?app=310";
 
     private WebView webView;
     private ProgressBar progressBar;
     private ValueCallback<Uri[]> filePathCallback;
+    private String lastAutomaticDownloadUrl = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +46,7 @@ public class MainActivity extends Activity {
         configureDownloads();
 
         if (savedInstanceState == null) {
+            webView.clearCache(true);
             webView.loadUrl(APP_URL);
         } else {
             webView.restoreState(savedInstanceState);
@@ -62,10 +65,12 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " ViralVoiceAndroid/2.0");
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        settings.setUserAgentString(settings.getUserAgentString() + " ViralVoiceAndroid/3.1");
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+        webView.addJavascriptInterface(new ViralVoiceBridge(), "ViralVoiceAndroid");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -189,33 +194,103 @@ public class MainActivity extends Activity {
                     String mimeType,
                     long contentLength
             ) {
-                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-                String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
-                String cookies = CookieManager.getInstance().getCookie(url);
-
-                if (cookies != null) {
-                    request.addRequestHeader("Cookie", cookies);
-                }
-
-                request.addRequestHeader("User-Agent", userAgent);
-                request.setMimeType(mimeType);
-                request.setTitle(fileName);
-                request.setDescription("ViralVoice");
-                request.setNotificationVisibility(
-                        DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
-                );
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-
-                DownloadManager manager =
-                        (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-                manager.enqueue(request);
-                Toast.makeText(
-                        MainActivity.this,
-                        R.string.download_started,
-                        Toast.LENGTH_SHORT
-                ).show();
+                enqueueDownload(url, userAgent, contentDisposition, mimeType, false);
             }
         });
+    }
+
+    private boolean enqueueDownload(
+            String url,
+            String userAgent,
+            String contentDisposition,
+            String mimeType,
+            boolean automatic
+    ) {
+        try {
+            Uri uri = Uri.parse(url);
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
+                throw new IllegalArgumentException("URL de téléchargement non sécurisée");
+            }
+
+            String safeMimeType = mimeType == null || mimeType.trim().isEmpty()
+                    ? "application/octet-stream"
+                    : mimeType;
+            String fileName = sanitizeFileName(
+                    URLUtil.guessFileName(url, contentDisposition, safeMimeType)
+            );
+            String cookies = CookieManager.getInstance().getCookie(url);
+
+            DownloadManager.Request request = new DownloadManager.Request(uri);
+            if (cookies != null && !cookies.isEmpty()) {
+                request.addRequestHeader("Cookie", cookies);
+            }
+            if (userAgent != null && !userAgent.isEmpty()) {
+                request.addRequestHeader("User-Agent", userAgent);
+            }
+
+            request.setMimeType(safeMimeType);
+            request.setTitle(fileName);
+            request.setDescription(automatic
+                    ? "Téléchargement automatique ViralVoice"
+                    : "Téléchargement ViralVoice");
+            request.setAllowedOverMetered(true);
+            request.setAllowedOverRoaming(false);
+            request.setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+            );
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+
+            DownloadManager manager =
+                    (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            if (manager == null) {
+                throw new IllegalStateException("Gestionnaire de téléchargement indisponible");
+            }
+
+            manager.enqueue(request);
+            Toast.makeText(
+                    MainActivity.this,
+                    automatic ? R.string.auto_download_started : R.string.download_started,
+                    Toast.LENGTH_LONG
+            ).show();
+            return true;
+        } catch (Exception error) {
+            Toast.makeText(MainActivity.this, R.string.download_failed, Toast.LENGTH_LONG).show();
+            return false;
+        }
+    }
+
+    private String sanitizeFileName(String fileName) {
+        String sanitized = fileName == null ? "ViralVoice-video.mp4" : fileName;
+        sanitized = sanitized.replaceAll("[\\\\/:*?\"<>|\\r\\n]", "-").trim();
+        if (sanitized.isEmpty()) {
+            return "ViralVoice-video.mp4";
+        }
+        return sanitized.length() > 120 ? sanitized.substring(0, 120) : sanitized;
+    }
+
+    private final class ViralVoiceBridge {
+        @JavascriptInterface
+        public void download(String url, String fileName, String mimeType) {
+            runOnUiThread(() -> {
+                if (url == null || url.trim().isEmpty() || url.equals(lastAutomaticDownloadUrl)) {
+                    return;
+                }
+
+                String cleanName = sanitizeFileName(fileName);
+                String contentDisposition = "attachment; filename=\"" + cleanName + "\"";
+                boolean started = enqueueDownload(
+                        url,
+                        webView.getSettings().getUserAgentString(),
+                        contentDisposition,
+                        mimeType,
+                        true
+                );
+
+                if (started) {
+                    lastAutomaticDownloadUrl = url;
+                }
+            });
+        }
     }
 
     @Override
@@ -254,6 +329,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (webView != null) {
+            webView.removeJavascriptInterface("ViralVoiceAndroid");
             webView.stopLoading();
             webView.setWebChromeClient(null);
             webView.setWebViewClient(null);
