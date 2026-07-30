@@ -58,7 +58,7 @@ async def lipsync(
 
     job_dir = Path(tempfile.mkdtemp(prefix="viralvoice-lipsync-"))
     video_path = job_dir / "input.mp4"
-    audio_path = job_dir / "input-audio"
+    audio_path = job_dir / "input-audio.mp3"
     output_path = job_dir / f"viralvoice-lipsync-{uuid.uuid4().hex[:8]}.mp4"
 
     try:
