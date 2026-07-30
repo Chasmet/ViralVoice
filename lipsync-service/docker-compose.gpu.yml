@@ -1,0 +1,23 @@
+services:
+  viralvoice-lipsync:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      LIPSYNC_SERVICE_TOKEN: "change-moi"
+      MAX_UPLOAD_MB: "120"
+      MAX_CONCURRENT_JOBS: "1"
+      LIPSYNC_JOB_TIMEOUT_SECONDS: "1800"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - musetalk-models:/opt/MuseTalk/models
+
+volumes:
+  musetalk-models:
