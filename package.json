@@ -1,12 +1,12 @@
 {
   "name": "viralvoice",
-  "version": "1.3.1",
-  "description": "ViralVoice - doublage vidéo et audio IA avec OpenAI, mobile-first.",
-  "main": "server.js",
+  "version": "2.0.0",
+  "description": "ViralVoice - doublage vidéo et audio IA synchronisé par intervenant.",
+  "main": "server-v2.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node -r ./runtime-limits.js server.js",
-    "check": "node --check server.js && node --check runtime-limits.js"
+    "start": "node -r ./runtime-limits.js server-v2.js",
+    "check": "node --check server-v2.js && node --check runtime-limits.js && node --check speaker-sync.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/speech-sync.js"
   },
   "engines": {
     "node": ">=20"
