@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ViralVoice</string>
+    <string name="download_started">Téléchargement démarré</string>
+    <string name="no_application">Aucune application ne peut ouvrir ce lien</string>
+</resources>
