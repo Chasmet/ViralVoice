@@ -270,10 +270,11 @@ class MuseTalkEngine:
 
     def _concat_video_chunks(self, chunks: list[Path], target: Path, work_dir: Path) -> None:
         concat_file = work_dir / "concat-video.txt"
-        concat_file.write_text(
-            "\n".join(f"file '{str(path).replace(chr(39), chr(39) + '\\\'' + chr(39))}'" for path in chunks) + "\n",
-            encoding="utf-8",
-        )
+        lines: list[str] = []
+        for chunk_path in chunks:
+            escaped_path = str(chunk_path).replace("'", "'\\''")
+            lines.append(f"file '{escaped_path}'")
+        concat_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
         self._run_ffmpeg([
             "-f", "concat", "-safe", "0", "-i", str(concat_file),
             "-an", "-c:v", "copy", "-movflags", "+faststart", str(target),
