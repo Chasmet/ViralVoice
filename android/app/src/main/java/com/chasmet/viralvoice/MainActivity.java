@@ -29,7 +29,7 @@ public class MainActivity extends Activity {
 
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final String APP_URL =
-            "https://chasmet.github.io/ViralVoice/?app=340";
+            "https://chasmet.github.io/ViralVoice/?app=360";
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -48,7 +48,8 @@ public class MainActivity extends Activity {
         configureDownloads();
 
         if (savedInstanceState == null) {
-            webView.loadUrl(APP_URL);
+            webView.clearCache(true);
+            webView.loadUrl(APP_URL + "&t=" + System.currentTimeMillis());
         } else {
             webView.restoreState(savedInstanceState);
         }
@@ -73,7 +74,7 @@ public class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setLoadsImagesAutomatically(true);
         settings.setUserAgentString(
-                settings.getUserAgentString() + " ViralVoiceAndroid/3.4"
+                settings.getUserAgentString() + " ViralVoiceAndroid/3.6"
         );
 
         CookieManager cookieManager = CookieManager.getInstance();

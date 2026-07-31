@@ -15,7 +15,6 @@
 
   let resultWasVisible = false;
 
-  upgradeVisibleVersion();
   hideSourcePreviews();
   syncBodyState();
 
@@ -52,27 +51,6 @@
       characterData: true,
       subtree: true
     });
-  }
-
-  function upgradeVisibleVersion() {
-    document.querySelectorAll('.version-pill').forEach(node => {
-      node.textContent = '3.6';
-    });
-    const caption = document.querySelector('.action-caption');
-    if (caption) {
-      caption.textContent =
-        'GPT adapte chaque réplique à sa durée, puis génère les voix premium.';
-    }
-    const footer = document.querySelector('.app-footer');
-    if (footer) {
-      const strong = footer.querySelector('strong');
-      const description = footer.querySelector('span');
-      if (strong) strong.textContent = 'ViralVoice Pro 3.6';
-      if (description) {
-        description.textContent =
-          'GPT-5.6 · Voix premium · Synchronisation temporelle';
-      }
-    }
   }
 
   function hideSourcePreviews() {
