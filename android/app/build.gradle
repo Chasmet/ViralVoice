@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+def playKeystorePath = System.getenv('PLAY_UPLOAD_KEYSTORE_PATH')
+def playStorePassword = System.getenv('PLAY_STORE_PASSWORD')
+def playKeyAlias = System.getenv('PLAY_KEY_ALIAS')
+def playKeyPassword = System.getenv('PLAY_KEY_PASSWORD')
+def hasPlaySigning = playKeystorePath && playStorePassword && playKeyAlias && playKeyPassword
+
 android {
     namespace 'com.chasmet.viralvoice'
     compileSdk 34
@@ -10,14 +16,28 @@ android {
         applicationId 'com.chasmet.viralvoice'
         minSdk 21
         targetSdk 34
-        versionCode 7
-        versionName '3.4.0'
+        versionCode 8
+        versionName '3.5.0'
+    }
+
+    signingConfigs {
+        if (hasPlaySigning) {
+            playRelease {
+                storeFile file(playKeystorePath)
+                storePassword playStorePassword
+                keyAlias playKeyAlias
+                keyPassword playKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasPlaySigning) {
+                signingConfig signingConfigs.playRelease
+            }
         }
     }
 
