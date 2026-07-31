@@ -2,24 +2,11 @@
   'use strict';
 
   const nativeFetch = window.fetch.bind(window);
-  const VERSION = '20260731v330';
+  const VERSION = '20260731v340';
   const autoDownloadedUrls = new Set();
-  let pendingLocalSync = null;
 
-  removeLegacyLipSyncUi();
-  renumberMixSection();
+  cleanLegacyLipSyncUi();
   refreshVisibleLimits();
-
-  const legacyObserver = new MutationObserver(() => {
-    removeLegacyLipSyncUi();
-    renumberMixSection();
-  });
-
-  legacyObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
 
   window.fetch = async (input, init = {}) => {
     const url = String(input || '');
@@ -33,8 +20,6 @@
       body.set('firstSpeakerRole', firstSpeakerRole ? firstSpeakerRole.value : 'male');
       body.set('maleVoice', maleVoice ? maleVoice.value : 'cedar');
       body.set('femaleVoice', femaleVoice ? femaleVoice.value : 'coral');
-
-      // Le moteur de bouche MuseTalk est définitivement désactivé dans l'application.
       body.set('lipSync', 'false');
       body.delete('lipSyncQuality');
       body.delete('lipSyncBboxShift');
@@ -46,91 +31,50 @@
     if (url.includes('/api/dub-video') && response.ok) {
       response.clone().json().then(data => {
         updateResultLabel(data);
-        startBestAvailableDownload(data, url);
+        startAutomaticDownload(data, url);
       }).catch(() => {});
     }
 
     return response;
   };
 
-  function startBestAvailableDownload(data, requestUrl) {
-    const mediaFile = document.getElementById('mediaFile');
-    const selectedFile = mediaFile && mediaFile.files ? mediaFile.files[0] : null;
-    const isVideo = Boolean(selectedFile && selectedFile.type.startsWith('video/'));
+  function startAutomaticDownload(data, requestUrl) {
+    const relativeUrl = data && (data.dubbedVideoUrl || data.dubbedAudioUrl);
+    if (!relativeUrl) return;
 
-    if (isVideo && data && data.dubbedVideoUrl && canUseAndroidLocalSync()) {
-      let videoUrl;
-      try {
-        videoUrl = new URL(data.dubbedVideoUrl, requestUrl).toString();
-      } catch {
-        startAutomaticVideoDownload(data, requestUrl);
-        return;
-      }
-
-      if (!videoUrl.startsWith('https://')) {
-        startAutomaticVideoDownload(data, requestUrl);
-        return;
-      }
-
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const fileName = `ViralVoice-Synchronisee-${timestamp}.mp4`;
-      pendingLocalSync = { data, requestUrl, fileName };
-
-      try {
-        const accepted = window.ViralVoiceAndroid.optimizeDub(videoUrl, fileName);
-        if (accepted) {
-          updateLocalSyncStatus(
-            'Traduction terminée. Le téléphone recale et réassemble maintenant les pistes audio/vidéo.'
-          );
-          return;
-        }
-      } catch (error) {
-        console.warn('Synchronisation locale Android indisponible', error);
-      }
-    }
-
-    startAutomaticVideoDownload(data, requestUrl);
-  }
-
-  function canUseAndroidLocalSync() {
-    return Boolean(
-      window.ViralVoiceAndroid &&
-      typeof window.ViralVoiceAndroid.optimizeDub === 'function'
-    );
-  }
-
-  function startAutomaticVideoDownload(data, requestUrl) {
-    if (!data || !data.dubbedVideoUrl) return;
-
-    let videoUrl;
+    let mediaUrl;
     try {
-      videoUrl = new URL(data.dubbedVideoUrl, requestUrl).toString();
+      mediaUrl = new URL(relativeUrl, requestUrl).toString();
     } catch {
       return;
     }
 
-    if (!videoUrl.startsWith('https://') || autoDownloadedUrls.has(videoUrl)) return;
-    autoDownloadedUrls.add(videoUrl);
+    if (!mediaUrl.startsWith('https://') || autoDownloadedUrls.has(mediaUrl)) return;
+    autoDownloadedUrls.add(mediaUrl);
 
+    const isVideo = Boolean(data.dubbedVideoUrl);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `ViralVoice-Doublee-${timestamp}.mp4`;
+    const fileName = isVideo
+      ? `ViralVoice-Doublee-${timestamp}.mp4`
+      : `ViralVoice-Audio-${timestamp}.mp3`;
+    const mimeType = isVideo ? 'video/mp4' : 'audio/mpeg';
 
     try {
       if (window.ViralVoiceAndroid && typeof window.ViralVoiceAndroid.download === 'function') {
-        window.ViralVoiceAndroid.download(videoUrl, fileName, 'video/mp4');
+        window.ViralVoiceAndroid.download(mediaUrl, fileName, mimeType);
         return;
       }
     } catch (error) {
-      console.warn('Pont Android de téléchargement indisponible', error);
+      console.warn('Téléchargement Android indisponible', error);
     }
 
     const link = document.createElement('a');
-    link.href = videoUrl;
+    link.href = mediaUrl;
     link.download = fileName;
     link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    window.setTimeout(() => link.remove(), 1000);
+    window.setTimeout(() => link.remove(), 500);
   }
 
   function updateResultLabel(data) {
@@ -140,62 +84,11 @@
     const speakers = Number(data?.speakersDetected || 1);
     const segments = Number(data?.synchronizedSegments || 0);
     speakerInfo.textContent =
-      `Traduction terminée · ${speakers} intervenant(s) · ${segments} passage(s) recalés sur la timeline originale.`;
+      `Traduction terminée · ${speakers} intervenant(s) · ${segments} passage(s) replacés sur la timeline originale.`;
   }
 
-  function updateLocalSyncStatus(message, type = 'loading') {
-    const speakerInfo = document.getElementById('speakerInfo');
-    const userStatus = document.getElementById('userStatus');
-
-    if (speakerInfo) speakerInfo.textContent = message;
-    if (userStatus) {
-      userStatus.textContent = message;
-      userStatus.classList.remove('hidden', 'error', 'success', 'warning', 'loading');
-      userStatus.classList.add(type);
-    }
-  }
-
-  window.ViralVoiceLocalSync = {
-    onStart() {
-      updateLocalSyncStatus(
-        'Traduction terminée. Synchronisation audio/vidéo locale avec la puissance du téléphone…',
-        'loading'
-      );
-    },
-
-    onComplete(fileName) {
-      updateLocalSyncStatus(
-        `Vidéo synchronisée et enregistrée dans Téléchargements/ViralVoice : ${fileName}`,
-        'success'
-      );
-      pendingLocalSync = null;
-    },
-
-    onError(message) {
-      const fallback = pendingLocalSync;
-      pendingLocalSync = null;
-      updateLocalSyncStatus(
-        `Montage local impossible (${message || 'erreur Android'}). Téléchargement de la version serveur…`,
-        'warning'
-      );
-      if (fallback) startAutomaticVideoDownload(fallback.data, fallback.requestUrl);
-    }
-  };
-
-  function removeLegacyLipSyncUi() {
-    document.querySelectorAll(
-      '.lip-sync-card, [data-lipsync-card], #lipSyncMode, #lipSyncBadge, #lipSyncHint'
-    ).forEach(element => {
-      const card = element.closest?.('.lip-sync-card, section.card') || element;
-      if (card && (
-        card.classList?.contains('lip-sync-card') ||
-        /synchronisation des lèvres|lip-sync vidéo|musetalk/i.test(card.textContent || '')
-      )) {
-        card.remove();
-      } else if (element.parentElement) {
-        element.remove();
-      }
-    });
+  function cleanLegacyLipSyncUi() {
+    document.querySelectorAll('.lip-sync-card, [data-lipsync-card]').forEach(card => card.remove());
 
     document.querySelectorAll('.notice, .status, [role="alert"]').forEach(element => {
       const text = String(element.textContent || '');
@@ -204,15 +97,6 @@
         element.classList.add('hidden');
       }
     });
-  }
-
-  function renumberMixSection() {
-    const mixTitle = document.getElementById('mixTitle');
-    const mixCard = mixTitle?.closest('section.card');
-    const marker = mixCard?.querySelector('.step-number');
-
-    if (mixTitle) mixTitle.textContent = '4. Mixage audio';
-    if (marker) marker.textContent = '4';
   }
 
   function refreshVisibleLimits() {
