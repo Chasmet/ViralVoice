@@ -58,16 +58,16 @@
     const selectedFile = mediaFile && mediaFile.files ? mediaFile.files[0] : null;
     const isVideo = Boolean(selectedFile && selectedFile.type.startsWith('video/'));
 
-    if (isVideo && data && data.dubbedAudioUrl && canUseAndroidLocalSync()) {
-      let audioUrl;
+    if (isVideo && data && data.dubbedVideoUrl && canUseAndroidLocalSync()) {
+      let videoUrl;
       try {
-        audioUrl = new URL(data.dubbedAudioUrl, requestUrl).toString();
+        videoUrl = new URL(data.dubbedVideoUrl, requestUrl).toString();
       } catch {
         startAutomaticVideoDownload(data, requestUrl);
         return;
       }
 
-      if (!audioUrl.startsWith('https://')) {
+      if (!videoUrl.startsWith('https://')) {
         startAutomaticVideoDownload(data, requestUrl);
         return;
       }
@@ -77,9 +77,11 @@
       pendingLocalSync = { data, requestUrl, fileName };
 
       try {
-        const accepted = window.ViralVoiceAndroid.optimizeDub(audioUrl, fileName);
+        const accepted = window.ViralVoiceAndroid.optimizeDub(videoUrl, fileName);
         if (accepted) {
-          updateLocalSyncStatus('Traduction terminée. Le téléphone assemble maintenant la vidéo et la voix.');
+          updateLocalSyncStatus(
+            'Traduction terminée. Le téléphone recale et réassemble maintenant les pistes audio/vidéo.'
+          );
           return;
         }
       } catch (error) {
