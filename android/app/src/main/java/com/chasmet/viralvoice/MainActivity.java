@@ -27,7 +27,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
     private static final int FILE_CHOOSER_REQUEST = 1001;
-    private static final String APP_URL = "https://chasmet.github.io/ViralVoice/?app=310";
+    private static final String APP_URL = "https://chasmet.github.io/ViralVoice/?app=320";
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -66,7 +66,7 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-        settings.setUserAgentString(settings.getUserAgentString() + " ViralVoiceAndroid/3.1");
+        settings.setUserAgentString(settings.getUserAgentString() + " ViralVoiceAndroid/3.2");
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
