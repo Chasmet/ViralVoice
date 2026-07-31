@@ -2,10 +2,12 @@
   'use strict';
 
   const nativeFetch = window.fetch.bind(window);
-  const VERSION = '20260731v363';
+  const VERSION = '20260731v364';
+  const AUTO_SAVE_KEY = 'viralvoiceAutoSave';
   const autoDownloadedUrls = new Set();
 
   removeLegacyLipSyncUi();
+  installAutoSaveOption();
 
   window.fetch = async (input, init = {}) => {
     const url = String(input || '');
@@ -37,6 +39,45 @@
     return response;
   };
 
+  function installAutoSaveOption() {
+    const install = () => {
+      if (document.getElementById('autoSaveMedia')) return;
+      const dock = document.querySelector('.action-dock');
+      if (!dock) return;
+
+      const row = document.createElement('label');
+      row.className = 'switch-row main-switch auto-save-row';
+      row.htmlFor = 'autoSaveMedia';
+      row.innerHTML = `
+        <input id="autoSaveMedia" type="checkbox" />
+        <span>
+          <strong>Enregistrer automatiquement sur mon téléphone</strong>
+          <small>L’APK écrit directement la vidéo dans Films/ViralVoice, sans dépendre du gestionnaire de téléchargement.</small>
+        </span>
+      `;
+
+      const checkbox = row.querySelector('input');
+      const stored = localStorage.getItem(AUTO_SAVE_KEY);
+      checkbox.checked = stored === null ? true : stored === 'true';
+      checkbox.addEventListener('change', () => {
+        localStorage.setItem(AUTO_SAVE_KEY, String(checkbox.checked));
+      });
+
+      dock.parentNode.insertBefore(row, dock);
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', install, { once: true });
+    } else {
+      install();
+    }
+  }
+
+  function isAutoSaveEnabled() {
+    const checkbox = document.getElementById('autoSaveMedia');
+    return checkbox ? checkbox.checked : true;
+  }
+
   function updateResultLabel(data) {
     const speakerInfo = document.getElementById('speakerInfo');
     if (!speakerInfo) return;
@@ -65,6 +106,8 @@
   }
 
   function startAutomaticDownload(data, requestUrl) {
+    if (!isAutoSaveEnabled()) return;
+
     const resultUrl = data?.dubbedVideoUrl || data?.dubbedAudioUrl;
     if (!resultUrl) return;
 
@@ -84,36 +127,34 @@
       : `ViralVoice-Premium-${timestamp}.mp3`;
     const mimeType = isVideo ? 'video/mp4' : 'audio/mpeg';
 
-    if (launchNativeDownload(mediaUrl, fileName, mimeType)) {
+    if (launchNativeSave(mediaUrl, fileName, mimeType)) {
       autoDownloadedUrls.add(mediaUrl);
-      announceAutomaticDownload();
+      announceAutomaticSave(isVideo);
       return;
     }
 
     if (launchBrowserDownload(mediaUrl, fileName)) {
       autoDownloadedUrls.add(mediaUrl);
-      announceAutomaticDownload();
+      announceAutomaticSave(isVideo);
     }
   }
 
-  function launchNativeDownload(mediaUrl, fileName, mimeType) {
+  function launchNativeSave(mediaUrl, fileName, mimeType) {
     try {
-      if (
-        !window.ViralVoiceAndroid ||
-        typeof window.ViralVoiceAndroid.download !== 'function'
-      ) {
-        return false;
-      }
+      if (!window.ViralVoiceAndroid) return false;
 
-      const accepted = window.ViralVoiceAndroid.download(
-        mediaUrl,
-        fileName,
-        mimeType
-      );
+      const method = typeof window.ViralVoiceAndroid.saveMedia === 'function'
+        ? window.ViralVoiceAndroid.saveMedia.bind(window.ViralVoiceAndroid)
+        : typeof window.ViralVoiceAndroid.download === 'function'
+        ? window.ViralVoiceAndroid.download.bind(window.ViralVoiceAndroid)
+        : null;
 
+      if (!method) return false;
+
+      const accepted = method(mediaUrl, fileName, mimeType);
       return accepted === true || accepted === 'true' || accepted === 1;
     } catch (error) {
-      console.warn('Pont Android indisponible', error);
+      console.warn('Sauvegarde Android indisponible', error);
       return false;
     }
   }
@@ -135,11 +176,13 @@
     }
   }
 
-  function announceAutomaticDownload() {
+  function announceAutomaticSave(isVideo) {
     const speakerInfo = document.getElementById('speakerInfo');
     if (!speakerInfo) return;
 
-    const message = 'Téléchargement automatique lancé dans le dossier Téléchargements.';
+    const message = isVideo
+      ? 'Enregistrement automatique lancé dans Films/ViralVoice.'
+      : 'Enregistrement automatique lancé dans Musique/ViralVoice.';
     if (!speakerInfo.textContent.includes(message)) {
       speakerInfo.textContent = `${speakerInfo.textContent} · ${message}`;
     }
