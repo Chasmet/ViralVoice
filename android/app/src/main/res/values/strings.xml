@@ -5,4 +5,7 @@
     <string name="auto_download_started">Vidéo terminée : téléchargement automatique démarré</string>
     <string name="download_failed">Impossible de lancer le téléchargement</string>
     <string name="no_application">Aucune application ne peut ouvrir ce lien</string>
+    <string name="local_sync_started">Synchronisation locale Android en cours</string>
+    <string name="local_sync_complete">Vidéo synchronisée dans Téléchargements/ViralVoice</string>
+    <string name="local_sync_failed">Le recalage local a échoué, utilisation de la version serveur</string>
 </resources>
