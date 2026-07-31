@@ -15,10 +15,11 @@
 
   let resultWasVisible = false;
 
-  removeLegacyLipSyncUi();
-  renumberMixSection();
+  installPerformanceStyles();
+  updateVersionLabels();
   hideSourcePreviews();
   syncBodyState();
+  updateProcessingStage();
 
   if (mediaFile) {
     mediaFile.addEventListener('change', () => {
@@ -39,22 +40,39 @@
   if (copyTextBtn) copyTextBtn.addEventListener('click', copyTranslation);
   if (newDubBtn) newDubBtn.addEventListener('click', startNewProject);
 
-  const observer = new MutationObserver(() => {
-    removeLegacyLipSyncUi();
-    renumberMixSection();
-    hideSourcePreviews();
-    syncBodyState();
-    updateProcessingStage();
-  });
-
-  observer.observe(document.body, { childList: true, subtree: true });
-
+  const stateObserver = new MutationObserver(syncBodyState);
   [statusCard, resultCard].filter(Boolean).forEach(element => {
-    observer.observe(element, { attributes: true, attributeFilter: ['class'] });
+    stateObserver.observe(element, { attributes: true, attributeFilter: ['class'] });
   });
 
   if (statusText) {
-    observer.observe(statusText, { childList: true, characterData: true, subtree: true });
+    const progressObserver = new MutationObserver(updateProcessingStage);
+    progressObserver.observe(statusText, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+  }
+
+  function installPerformanceStyles() {
+    if (document.getElementById('viralvoicePerformance34')) return;
+    const link = document.createElement('link');
+    link.id = 'viralvoicePerformance34';
+    link.rel = 'stylesheet';
+    link.href = 'performance-v34.css?v=20260731v340';
+    document.head.appendChild(link);
+  }
+
+  function updateVersionLabels() {
+    const version = document.querySelector('.version-pill');
+    const footer = document.querySelector('.app-footer strong');
+    const caption = document.querySelector('.action-caption');
+    if (version) version.textContent = '3.4';
+    if (footer) footer.textContent = 'ViralVoice Pro 3.4';
+    if (caption) {
+      caption.textContent =
+        'La traduction, les voix et le recalage temporel sont générés automatiquement.';
+    }
   }
 
   function hideSourcePreviews() {
@@ -62,34 +80,12 @@
       try {
         media.pause();
         media.removeAttribute('src');
-        media.load();
-      } catch (error) {
-        console.debug('Aperçu source déjà neutralisé.', error);
+      } catch {
+        // Aucun aperçu source à arrêter.
       }
       media.classList.add('hidden', 'source-preview-hidden');
       media.setAttribute('aria-hidden', 'true');
     });
-  }
-
-  function removeLegacyLipSyncUi() {
-    document.querySelectorAll('.lip-sync-card').forEach(card => card.remove());
-
-    document.querySelectorAll('.notice, .status, [role="alert"]').forEach(element => {
-      const text = String(element.textContent || '');
-      if (/LIPSYNC_SERVICE_URL|lip-sync indisponible|musetalk|GPU à configurer/i.test(text)) {
-        element.textContent = '';
-        element.classList.add('hidden');
-      }
-    });
-  }
-
-  function renumberMixSection() {
-    const mixTitle = document.getElementById('mixTitle');
-    const mixCard = mixTitle?.closest('section.card');
-    const marker = mixCard?.querySelector('.step-number');
-
-    if (mixTitle) mixTitle.textContent = '4. Mixage audio';
-    if (marker) marker.textContent = '4';
   }
 
   function syncBodyState() {
@@ -105,10 +101,10 @@
 
     if (hasResult && !resultWasVisible) {
       resultWasVisible = true;
-      window.setTimeout(() => {
-        resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.requestAnimationFrame(() => {
+        resultCard.scrollIntoView({ behavior: 'auto', block: 'start' });
         resultCard.focus({ preventScroll: true });
-      }, 180);
+      });
     }
 
     if (!hasResult) resultWasVisible = false;
@@ -126,7 +122,6 @@
     if (
       message.includes('final') ||
       message.includes('préparation du fichier') ||
-      message.includes('synchronisation locale') ||
       message.includes('terminé')
     ) activeIndex = 3;
 
@@ -147,7 +142,7 @@
     try {
       await navigator.clipboard.writeText(text);
       setTemporaryButtonText(copyTextBtn, 'Texte copié ✓');
-    } catch (error) {
+    } catch {
       outputText.focus();
       outputText.select();
       document.execCommand('copy');
@@ -166,9 +161,9 @@
     document.body.classList.remove('has-result', 'is-processing', 'has-file');
     resultWasVisible = false;
 
-    window.setTimeout(() => {
-      projectCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 40);
+    window.requestAnimationFrame(() => {
+      projectCard?.scrollIntoView({ behavior: 'auto', block: 'start' });
+    });
   }
 
   function setTemporaryButtonText(button, text) {
@@ -178,8 +173,8 @@
     button.textContent = text;
     window.setTimeout(() => {
       button.textContent = original;
-    }, 1600);
+    }, 1200);
   }
 
-  window.VIRALVOICE_UI_VERSION = '3.3.0';
+  window.VIRALVOICE_UI_VERSION = '3.4.0';
 })();
