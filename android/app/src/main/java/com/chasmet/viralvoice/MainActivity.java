@@ -68,13 +68,15 @@ public class MainActivity extends Activity {
             "e.textContent='';e.classList.add('hidden');}});" +
             "const m=document.getElementById('mixTitle');" +
             "if(m){m.textContent='4. Mixage audio';" +
-            "const n=m.closest('section')?.querySelector('.step-number');if(n)n.textContent='4';}" +
+            "const s=m.closest('section');const n=s?s.querySelector('.step-number'):null;" +
+            "if(n)n.textContent='4';}" +
             "})();";
 
     private WebView webView;
     private ProgressBar progressBar;
     private ValueCallback<Uri[]> filePathCallback;
     private String lastAutomaticDownloadUrl = "";
+    private String webUserAgent = "ViralVoiceAndroid/3.3";
 
     private final ExecutorService localMediaExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean localSyncRunning = new AtomicBoolean(false);
@@ -115,7 +117,8 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-        settings.setUserAgentString(settings.getUserAgentString() + " ViralVoiceAndroid/3.3");
+        webUserAgent = settings.getUserAgentString() + " ViralVoiceAndroid/3.3";
+        settings.setUserAgentString(webUserAgent);
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
@@ -312,6 +315,7 @@ public class MainActivity extends Activity {
     private void startLocalSynchronization(String remoteVideoUrl, String requestedFileName) {
         notifyLocalSync("onStart", "");
         Toast.makeText(this, R.string.local_sync_started, Toast.LENGTH_LONG).show();
+        final String cookies = CookieManager.getInstance().getCookie(remoteVideoUrl);
 
         localMediaExecutor.execute(() -> {
             try {
@@ -319,7 +323,7 @@ public class MainActivity extends Activity {
                         getCacheDir(),
                         "viralvoice-source-" + System.nanoTime() + ".mp4"
                 );
-                downloadSecureFile(remoteVideoUrl, currentDownloadedVideo);
+                downloadSecureFile(remoteVideoUrl, currentDownloadedVideo, cookies);
 
                 runOnUiThread(() -> startTransformerExport(
                         currentDownloadedVideo,
@@ -331,7 +335,11 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void downloadSecureFile(String remoteUrl, File destination) throws Exception {
+    private void downloadSecureFile(
+            String remoteUrl,
+            File destination,
+            String cookies
+    ) throws Exception {
         URL url = new URL(remoteUrl);
         if (!"https".equalsIgnoreCase(url.getProtocol())) {
             throw new IllegalArgumentException("Adresse vidéo non sécurisée");
@@ -341,9 +349,8 @@ public class MainActivity extends Activity {
         connection.setConnectTimeout(20_000);
         connection.setReadTimeout(180_000);
         connection.setInstanceFollowRedirects(true);
-        connection.setRequestProperty("User-Agent", webView.getSettings().getUserAgentString());
+        connection.setRequestProperty("User-Agent", webUserAgent);
 
-        String cookies = CookieManager.getInstance().getCookie(remoteUrl);
         if (cookies != null && !cookies.isEmpty()) {
             connection.setRequestProperty("Cookie", cookies);
         }
@@ -558,7 +565,6 @@ public class MainActivity extends Activity {
 
     private void deleteQuietly(File file) {
         if (file != null && file.exists()) {
-            // Le cache sera aussi nettoyé automatiquement par Android en cas d’échec de suppression.
             file.delete();
         }
     }
@@ -575,7 +581,7 @@ public class MainActivity extends Activity {
                 String contentDisposition = "attachment; filename=\"" + cleanName + "\"";
                 boolean started = enqueueDownload(
                         url,
-                        webView.getSettings().getUserAgentString(),
+                        webUserAgent,
                         contentDisposition,
                         mimeType,
                         true
@@ -650,6 +656,7 @@ public class MainActivity extends Activity {
             webView.setWebChromeClient(null);
             webView.setWebViewClient(null);
             webView.destroy();
+            webView = null;
         }
         super.onDestroy();
     }
