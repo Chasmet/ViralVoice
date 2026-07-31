@@ -15,6 +15,7 @@
 
   let resultWasVisible = false;
 
+  upgradeVisibleVersion();
   hideSourcePreviews();
   syncBodyState();
 
@@ -51,6 +52,27 @@
       characterData: true,
       subtree: true
     });
+  }
+
+  function upgradeVisibleVersion() {
+    document.querySelectorAll('.version-pill').forEach(node => {
+      node.textContent = '3.6';
+    });
+    const caption = document.querySelector('.action-caption');
+    if (caption) {
+      caption.textContent =
+        'GPT adapte chaque réplique à sa durée, puis génère les voix premium.';
+    }
+    const footer = document.querySelector('.app-footer');
+    if (footer) {
+      const strong = footer.querySelector('strong');
+      const description = footer.querySelector('span');
+      if (strong) strong.textContent = 'ViralVoice Pro 3.6';
+      if (description) {
+        description.textContent =
+          'GPT-5.6 · Voix premium · Synchronisation temporelle';
+      }
+    }
   }
 
   function hideSourcePreviews() {
@@ -95,11 +117,16 @@
     const stages = Array.from(document.querySelectorAll('.processing-steps span'));
     let activeIndex = 0;
 
-    if (message.includes('transcription') || message.includes('traduction')) activeIndex = 1;
+    if (
+      message.includes('transcription') ||
+      message.includes('traduction') ||
+      message.includes('adaptation')
+    ) activeIndex = 1;
     if (
       message.includes('voix ia') ||
       message.includes('création de la voix') ||
-      message.includes('profil vocal')
+      message.includes('profil vocal') ||
+      message.includes('doublage premium')
     ) activeIndex = 2;
     if (
       message.includes('final') ||
@@ -156,5 +183,5 @@
     }, 1400);
   }
 
-  window.VIRALVOICE_UI_VERSION = '3.5.0';
+  window.VIRALVOICE_UI_VERSION = '3.6.0';
 })();
