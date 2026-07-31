@@ -1,21 +1,16 @@
 package com.chasmet.viralvoice;
 
+import android.Manifest;
 import android.app.Activity;
-import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.database.Cursor;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Message;
-import android.util.Log;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
@@ -30,53 +25,18 @@ import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 public class MainActivity extends Activity {
 
-    private static final String TAG = "ViralVoiceDownload";
     private static final int FILE_CHOOSER_REQUEST = 1001;
-    private static final int MAX_DOWNLOAD_RETRIES = 2;
+    private static final int STORAGE_PERMISSION_REQUEST = 1002;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 1003;
     private static final String APP_URL =
-            "https://chasmet.github.io/ViralVoice/?app=363";
+            "https://chasmet.github.io/ViralVoice/?app=364";
 
     private WebView webView;
     private ProgressBar progressBar;
     private ValueCallback<Uri[]> filePathCallback;
-    private String lastAutomaticDownloadUrl = "";
-    private boolean downloadReceiverRegistered = false;
-
-    private final Map<Long, PendingDownload> pendingDownloads =
-            new ConcurrentHashMap<>();
-
-    private final BroadcastReceiver downloadReceiver =
-            new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    if (!DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(
-                            intent.getAction()
-                    )) {
-                        return;
-                    }
-
-                    long downloadId = intent.getLongExtra(
-                            DownloadManager.EXTRA_DOWNLOAD_ID,
-                            -1L
-                    );
-                    if (downloadId < 0) {
-                        return;
-                    }
-
-                    PendingDownload pending =
-                            pendingDownloads.remove(downloadId);
-                    if (pending == null) {
-                        return;
-                    }
-
-                    inspectCompletedDownload(downloadId, pending);
-                }
-            };
+    private String lastAutomaticSaveUrl = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,13 +48,34 @@ public class MainActivity extends Activity {
 
         configureWebView();
         configureDownloads();
-        registerDownloadReceiver();
+        requestUsefulPermissions();
 
         if (savedInstanceState == null) {
             webView.clearCache(true);
             webView.loadUrl(APP_URL + "&t=" + System.currentTimeMillis());
         } else {
             webView.restoreState(savedInstanceState);
+        }
+    }
+
+    private void requestUsefulPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    NOTIFICATION_PERMISSION_REQUEST
+            );
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
+                && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    STORAGE_PERMISSION_REQUEST
+            );
         }
     }
 
@@ -117,7 +98,7 @@ public class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setLoadsImagesAutomatically(true);
         settings.setUserAgentString(
-                settings.getUserAgentString() + " ViralVoiceAndroid/3.6.3"
+                settings.getUserAgentString() + " ViralVoiceAndroid/3.6.4"
         );
 
         CookieManager cookieManager = CookieManager.getInstance();
@@ -142,6 +123,10 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
+                view.evaluateJavascript(
+                        "window.VIRALVOICE_NATIVE_SAVE_AVAILABLE=true;",
+                        null
+                );
             }
 
             @Override
@@ -195,10 +180,7 @@ public class MainActivity extends Activity {
                 intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
 
                 try {
-                    startActivityForResult(
-                            intent,
-                            FILE_CHOOSER_REQUEST
-                    );
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST);
                     return true;
                 } catch (ActivityNotFoundException error) {
                     filePathCallback = null;
@@ -248,7 +230,6 @@ public class MainActivity extends Activity {
 
     private boolean handleUrl(Uri uri) {
         String host = uri.getHost();
-
         if (host != null && (
                 host.equals("chasmet.github.io")
                         || host.equals("viralvoice.onrender.com")
@@ -280,269 +261,61 @@ public class MainActivity extends Activity {
                     String mimeType,
                     long contentLength
             ) {
-                enqueueDownload(
+                String fileName = URLUtil.guessFileName(
                         url,
-                        userAgent,
                         contentDisposition,
-                        mimeType,
-                        false,
-                        0,
-                        null,
-                        true
+                        mimeType
                 );
+                startNativeSave(url, fileName, mimeType, false);
             }
         });
     }
 
-    private void registerDownloadReceiver() {
-        IntentFilter filter = new IntentFilter(
-                DownloadManager.ACTION_DOWNLOAD_COMPLETE
-        );
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(
-                    downloadReceiver,
-                    filter,
-                    Context.RECEIVER_NOT_EXPORTED
-            );
-        } else {
-            registerReceiver(downloadReceiver, filter);
-        }
-        downloadReceiverRegistered = true;
-    }
-
-    private long enqueueDownload(
+    private boolean startNativeSave(
             String url,
-            String userAgent,
-            String contentDisposition,
-            String mimeType,
-            boolean automatic,
-            int retryCount,
-            String requestedFileName,
-            boolean announceStart
-    ) {
-        try {
-            Uri uri = Uri.parse(url);
-            if (!"https".equalsIgnoreCase(uri.getScheme())) {
-                throw new IllegalArgumentException(
-                        "URL de téléchargement non sécurisée"
-                );
-            }
-
-            String safeMimeType =
-                    mimeType == null || mimeType.trim().isEmpty()
-                            ? "application/octet-stream"
-                            : mimeType;
-
-            String guessedName = requestedFileName;
-            if (guessedName == null || guessedName.trim().isEmpty()) {
-                guessedName = URLUtil.guessFileName(
-                        url,
-                        contentDisposition,
-                        safeMimeType
-                );
-            }
-
-            String fileName = ensureMediaExtension(
-                    sanitizeFileName(guessedName),
-                    safeMimeType
-            );
-
-            DownloadManager.Request request =
-                    new DownloadManager.Request(uri);
-
-            String cookies =
-                    CookieManager.getInstance().getCookie(url);
-            if (cookies != null && !cookies.isEmpty()) {
-                request.addRequestHeader("Cookie", cookies);
-            }
-            if (userAgent != null && !userAgent.isEmpty()) {
-                request.addRequestHeader("User-Agent", userAgent);
-            }
-            request.addRequestHeader(
-                    "Accept",
-                    safeMimeType + ",application/octet-stream;q=0.9,*/*;q=0.8"
-            );
-            request.addRequestHeader("Referer", APP_URL);
-
-            request.setMimeType(safeMimeType);
-            request.setTitle(fileName);
-            request.setDescription(
-                    automatic
-                            ? "Vidéo ViralVoice terminée"
-                            : "Téléchargement ViralVoice"
-            );
-            request.setAllowedNetworkTypes(
-                    DownloadManager.Request.NETWORK_WIFI
-                            | DownloadManager.Request.NETWORK_MOBILE
-            );
-            request.setAllowedOverMetered(true);
-            request.setAllowedOverRoaming(false);
-            request.setNotificationVisibility(
-                    DownloadManager.Request
-                            .VISIBILITY_VISIBLE_NOTIFY_COMPLETED
-            );
-            request.setDestinationInExternalPublicDir(
-                    Environment.DIRECTORY_DOWNLOADS,
-                    fileName
-            );
-            request.allowScanningByMediaScanner();
-
-            DownloadManager manager =
-                    (DownloadManager) getSystemService(
-                            Context.DOWNLOAD_SERVICE
-                    );
-            if (manager == null) {
-                throw new IllegalStateException(
-                        "Gestionnaire de téléchargement indisponible"
-                );
-            }
-
-            long downloadId = manager.enqueue(request);
-            pendingDownloads.put(
-                    downloadId,
-                    new PendingDownload(
-                            url,
-                            userAgent,
-                            contentDisposition,
-                            safeMimeType,
-                            automatic,
-                            retryCount,
-                            fileName
-                    )
-            );
-
-            if (announceStart) {
-                showToast(
-                        automatic
-                                ? R.string.auto_download_started
-                                : R.string.download_started
-                );
-            }
-
-            return downloadId;
-        } catch (Exception error) {
-            Log.e(TAG, "Impossible de lancer le téléchargement", error);
-            if (announceStart) {
-                showToast(R.string.download_failed);
-            }
-            return -1L;
-        }
-    }
-
-    private void inspectCompletedDownload(
-            long downloadId,
-            PendingDownload pending
-    ) {
-        DownloadManager manager =
-                (DownloadManager) getSystemService(
-                        Context.DOWNLOAD_SERVICE
-                );
-        if (manager == null) {
-            handleFinalDownloadFailure(pending);
-            return;
-        }
-
-        DownloadManager.Query query =
-                new DownloadManager.Query().setFilterById(downloadId);
-
-        try (Cursor cursor = manager.query(query)) {
-            if (cursor == null || !cursor.moveToFirst()) {
-                retryOrFallback(pending, -1);
-                return;
-            }
-
-            int statusIndex = cursor.getColumnIndex(
-                    DownloadManager.COLUMN_STATUS
-            );
-            int reasonIndex = cursor.getColumnIndex(
-                    DownloadManager.COLUMN_REASON
-            );
-            int status = statusIndex >= 0
-                    ? cursor.getInt(statusIndex)
-                    : DownloadManager.STATUS_FAILED;
-            int reason = reasonIndex >= 0 ? cursor.getInt(reasonIndex) : -1;
-
-            if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                showToast(R.string.download_complete);
-                return;
-            }
-
-            retryOrFallback(pending, reason);
-        } catch (Exception error) {
-            Log.e(TAG, "Lecture du statut du téléchargement impossible", error);
-            retryOrFallback(pending, -1);
-        }
-    }
-
-    private void retryOrFallback(
-            PendingDownload pending,
-            int reason
-    ) {
-        Log.w(
-                TAG,
-                "Téléchargement échoué, raison=" + reason
-                        + ", tentative=" + pending.retryCount
-        );
-
-        if (pending.retryCount < MAX_DOWNLOAD_RETRIES) {
-            showToast(R.string.download_retry);
-            long retryId = enqueueDownload(
-                    pending.url,
-                    pending.userAgent,
-                    pending.contentDisposition,
-                    pending.mimeType,
-                    pending.automatic,
-                    pending.retryCount + 1,
-                    pending.fileName,
-                    false
-            );
-            if (retryId >= 0) {
-                return;
-            }
-        }
-
-        handleFinalDownloadFailure(pending);
-    }
-
-    private void handleFinalDownloadFailure(PendingDownload pending) {
-        showToast(R.string.download_browser_fallback);
-        openExternal(Uri.parse(pending.url));
-    }
-
-    private String ensureMediaExtension(
             String fileName,
-            String mimeType
+            String mimeType,
+            boolean automatic
     ) {
-        String lower = fileName.toLowerCase();
-        if ("video/mp4".equalsIgnoreCase(mimeType)
-                && !lower.endsWith(".mp4")) {
-            return fileName + ".mp4";
-        }
-        if ("audio/mpeg".equalsIgnoreCase(mimeType)
-                && !lower.endsWith(".mp3")) {
-            return fileName + ".mp3";
-        }
-        return fileName;
-    }
-
-    private String sanitizeFileName(String fileName) {
-        String sanitized =
-                fileName == null
-                        ? "ViralVoice-video.mp4"
-                        : fileName;
-
-        sanitized = sanitized
-                .replaceAll("[\\\\/:*?\"<>|\\r\\n]", "-")
-                .trim();
-
-        if (sanitized.isEmpty()) {
-            return "ViralVoice-video.mp4";
+        if (url == null || url.trim().isEmpty()) {
+            return false;
         }
 
-        return sanitized.length() > 120
-                ? sanitized.substring(0, 120)
-                : sanitized;
+        Uri uri = Uri.parse(url);
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            return false;
+        }
+
+        if (automatic && url.equals(lastAutomaticSaveUrl)) {
+            return true;
+        }
+
+        String userAgent = webView.getSettings().getUserAgentString();
+        String cookies = CookieManager.getInstance().getCookie(url);
+
+        Intent saveIntent = new Intent(this, MediaSaveService.class);
+        saveIntent.putExtra(MediaSaveService.EXTRA_URL, url);
+        saveIntent.putExtra(MediaSaveService.EXTRA_FILE_NAME, fileName);
+        saveIntent.putExtra(MediaSaveService.EXTRA_MIME_TYPE, mimeType);
+        saveIntent.putExtra(MediaSaveService.EXTRA_USER_AGENT, userAgent);
+        saveIntent.putExtra(MediaSaveService.EXTRA_COOKIES, cookies);
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(saveIntent);
+            } else {
+                startService(saveIntent);
+            }
+
+            if (automatic) {
+                lastAutomaticSaveUrl = url;
+            }
+            showToast(R.string.native_save_started);
+            return true;
+        } catch (Exception error) {
+            showToast(R.string.native_save_failed);
+            return false;
+        }
     }
 
     private void showToast(int stringResource) {
@@ -555,68 +328,21 @@ public class MainActivity extends Activity {
 
     private final class ViralVoiceBridge {
         @JavascriptInterface
+        public boolean saveMedia(
+                String url,
+                String fileName,
+                String mimeType
+        ) {
+            return startNativeSave(url, fileName, mimeType, true);
+        }
+
+        @JavascriptInterface
         public boolean download(
                 String url,
                 String fileName,
                 String mimeType
         ) {
-            if (url == null || url.trim().isEmpty()) {
-                return false;
-            }
-
-            if (url.equals(lastAutomaticDownloadUrl)) {
-                return true;
-            }
-
-            String cleanName = sanitizeFileName(fileName);
-            String contentDisposition =
-                    "attachment; filename=\"" + cleanName + "\"";
-
-            long downloadId = enqueueDownload(
-                    url,
-                    webView.getSettings().getUserAgentString(),
-                    contentDisposition,
-                    mimeType,
-                    true,
-                    0,
-                    cleanName,
-                    true
-            );
-
-            if (downloadId >= 0) {
-                lastAutomaticDownloadUrl = url;
-                return true;
-            }
-
-            return false;
-        }
-    }
-
-    private static final class PendingDownload {
-        final String url;
-        final String userAgent;
-        final String contentDisposition;
-        final String mimeType;
-        final boolean automatic;
-        final int retryCount;
-        final String fileName;
-
-        PendingDownload(
-                String url,
-                String userAgent,
-                String contentDisposition,
-                String mimeType,
-                boolean automatic,
-                int retryCount,
-                String fileName
-        ) {
-            this.url = url;
-            this.userAgent = userAgent;
-            this.contentDisposition = contentDisposition;
-            this.mimeType = mimeType;
-            this.automatic = automatic;
-            this.retryCount = retryCount;
-            this.fileName = fileName;
+            return startNativeSave(url, fileName, mimeType, true);
         }
     }
 
@@ -628,19 +354,15 @@ public class MainActivity extends Activity {
     ) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (
-                requestCode != FILE_CHOOSER_REQUEST
-                        || filePathCallback == null
-        ) {
+        if (requestCode != FILE_CHOOSER_REQUEST
+                || filePathCallback == null) {
             return;
         }
 
         Uri[] results = null;
-        if (
-                resultCode == RESULT_OK
-                        && data != null
-                        && data.getData() != null
-        ) {
+        if (resultCode == RESULT_OK
+                && data != null
+                && data.getData() != null) {
             results = new Uri[]{data.getData()};
         }
 
@@ -667,24 +389,13 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (downloadReceiverRegistered) {
-            try {
-                unregisterReceiver(downloadReceiver);
-            } catch (IllegalArgumentException ignored) {
-                // Récepteur déjà retiré.
-            }
-            downloadReceiverRegistered = false;
-        }
-
         if (filePathCallback != null) {
             filePathCallback.onReceiveValue(null);
             filePathCallback = null;
         }
 
         if (webView != null) {
-            webView.removeJavascriptInterface(
-                    "ViralVoiceAndroid"
-            );
+            webView.removeJavascriptInterface("ViralVoiceAndroid");
             webView.stopLoading();
             webView.setDownloadListener(null);
             webView.setWebChromeClient(null);
