@@ -1,18 +1,19 @@
 {
   "name": "viralvoice",
-  "version": "3.6.0",
+  "version": "3.6.1",
   "description": "ViralVoice - doublage IA premium multi-intervenants avec adaptation temporelle.",
   "main": "server-v3.js",
   "type": "commonjs",
   "scripts": {
     "start": "node -r ./runtime-limits.js server-v3.js",
-    "check": "node --check server-v3.js && node --check runtime-limits.js && node --check speaker-sync-v35.js && node --check speaker-sync-v36.js && node --check pro-v35.js && node --check pro-v36.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/speech-sync.js"
+    "check": "node --check server-v3.js && node --check runtime-limits.js && node --check speaker-sync-v35.js && node --check speaker-sync-v36.js && node --check pro-v35.js && node --check pro-v36.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/speech-sync.js && node --check scripts/media-fit-smoke.js && node scripts/media-fit-smoke.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "latest",
+    "@ffprobe-installer/ffprobe": "latest",
     "@supabase/supabase-js": "latest",
     "cors": "latest",
     "dotenv": "latest",
