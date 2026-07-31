@@ -2,7 +2,7 @@
   'use strict';
 
   const nativeFetch = window.fetch.bind(window);
-  const VERSION = '20260731v350';
+  const VERSION = '20260731v360';
   const autoDownloadedUrls = new Set();
 
   removeLegacyLipSyncUi();
@@ -16,10 +16,7 @@
       const maleVoice = document.getElementById('maleVoice');
       const femaleVoice = document.getElementById('femaleVoice');
 
-      body.set(
-        'firstSpeakerRole',
-        firstSpeakerRole ? firstSpeakerRole.value : 'auto'
-      );
+      body.set('firstSpeakerRole', firstSpeakerRole ? firstSpeakerRole.value : 'auto');
       body.set('maleVoice', maleVoice ? maleVoice.value : 'cedar');
       body.set('femaleVoice', femaleVoice ? femaleVoice.value : 'coral');
       body.set('lipSync', 'false');
@@ -48,15 +45,22 @@
     const feminine = profiles.filter(item => item?.profile === 'feminine').length;
     const masculine = profiles.filter(item => item?.profile === 'masculine').length;
     const neutral = profiles.filter(item => item?.profile === 'neutral').length;
+    const synchronized = Number(data?.synchronizedSegments || 0);
+    const adapted = Number(data?.durationAdaptedSegments || 0);
+    const fallbacks = Number(data?.voiceFallbackSegments || 0);
     const details = [];
 
     if (feminine) details.push(`${feminine} voix féminine${feminine > 1 ? 's' : ''}`);
     if (masculine) details.push(`${masculine} voix masculine${masculine > 1 ? 's' : ''}`);
     if (neutral) details.push(`${neutral} voix à confirmer`);
 
+    const quality = fallbacks > 0
+      ? `${fallbacks} passage(s) en voix de secours`
+      : 'voix premium complète';
+
     speakerInfo.textContent =
-      `Traduction terminée · ${Number(data?.speakersDetected || 1)} intervenant(s) · ` +
-      `${Number(data?.synchronizedSegments || 0)} passage(s) recalés` +
+      `Doublage premium terminé · ${Number(data?.speakersDetected || 1)} intervenant(s) · ` +
+      `${adapted}/${synchronized} passage(s) adaptés à leur durée · ${quality}` +
       (details.length ? ` · ${details.join(', ')}` : '');
   }
 
@@ -77,8 +81,8 @@
     const isVideo = Boolean(data?.dubbedVideoUrl);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = isVideo
-      ? `ViralVoice-AutoVoix-${timestamp}.mp4`
-      : `ViralVoice-AutoVoix-${timestamp}.mp3`;
+      ? `ViralVoice-Premium-${timestamp}.mp4`
+      : `ViralVoice-Premium-${timestamp}.mp3`;
     const mimeType = isVideo ? 'video/mp4' : 'audio/mpeg';
 
     try {
