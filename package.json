@@ -1,12 +1,12 @@
 {
   "name": "viralvoice",
-  "version": "3.0.0",
-  "description": "ViralVoice - doublage IA multi-intervenants avec moteur vidéo lip-sync MuseTalk.",
+  "version": "3.5.0",
+  "description": "ViralVoice - doublage IA multi-intervenants avec détection automatique du profil vocal.",
   "main": "server-v3.js",
   "type": "commonjs",
   "scripts": {
     "start": "node -r ./runtime-limits.js server-v3.js",
-    "check": "node --check server-v3.js && node --check runtime-limits.js && node --check speaker-sync.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/speech-sync.js && node --check lib/lipsync-client.js"
+    "check": "node --check server-v3.js && node --check runtime-limits.js && node --check speaker-sync-v35.js && node --check pro-v35.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/speech-sync.js"
   },
   "engines": {
     "node": ">=20"
@@ -14,12 +14,10 @@
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "latest",
     "@supabase/supabase-js": "latest",
-    "axios": "^1.7.9",
     "cors": "latest",
     "dotenv": "latest",
     "express": "latest",
     "fluent-ffmpeg": "latest",
-    "form-data": "^4.0.1",
     "multer": "latest",
     "openai": "latest"
   }
