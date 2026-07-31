@@ -1,0 +1,32 @@
+name: Cache bust ViralVoice 3.6.3
+
+on:
+  push:
+    branches:
+      - agent/viralvoice-363-auto-download
+    paths:
+      - speaker-sync-v36.js
+      - .github/workflows/cache-bust-363.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-index:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/viralvoice-363-auto-download
+      - name: Force les ressources 3.6.3
+        run: |
+          sed -i 's/20260731v360/20260731v363/g' index.html
+          if git diff --quiet -- index.html; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Force le cache des ressources ViralVoice 3.6.3"
+          git push origin HEAD:agent/viralvoice-363-auto-download
