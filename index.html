@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#070a14" />
   <meta name="background-color" content="#070a14" />
-  <meta name="description" content="ViralVoice traduit, double et synchronise les voix de tes vidéos avec l’intelligence artificielle." />
+  <meta name="description" content="ViralVoice traduit et double les voix de tes vidéos avec l’intelligence artificielle." />
   <title>ViralVoice Pro — Doublage vidéo IA</title>
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-512.png?v=20260731v320" />
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=20260731v320" />
-  <link rel="apple-touch-icon" href="icon-512.png?v=20260731v320" />
-  <link rel="manifest" href="manifest.json?v=20260731v320" />
-  <link rel="stylesheet" href="style.css?v=20260731v320" />
-  <link rel="stylesheet" href="premium-ui.css?v=20260731v320" />
-  <link rel="stylesheet" href="refonte-v32.css?v=20260731v320" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-512.png?v=20260731v330" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=20260731v330" />
+  <link rel="apple-touch-icon" href="icon-512.png?v=20260731v330" />
+  <link rel="manifest" href="manifest.json?v=20260731v330" />
+  <link rel="stylesheet" href="style.css?v=20260731v330" />
+  <link rel="stylesheet" href="premium-ui.css?v=20260731v330" />
+  <link rel="stylesheet" href="refonte-v32.css?v=20260731v330" />
 </head>
 <body>
   <main class="app">
     <header class="hero pro-hero">
       <div class="brand-row">
-        <button id="adminLogoBtn" class="logo" type="button" aria-label="Ouvrir ViralVoice"><img src="icon-512.png?v=20260731v320" alt="Logo ViralVoice" class="app-logo-img" /></button>
-        <div class="brand-copy"><div class="brand-kicker"><span class="eyebrow">ViralVoice Pro</span><span class="version-pill">3.2</span></div><p class="brand-tagline">Studio mobile de doublage IA</p></div>
+        <button id="adminLogoBtn" class="logo" type="button" aria-label="Ouvrir ViralVoice"><img src="icon-512.png?v=20260731v330" alt="Logo ViralVoice" class="app-logo-img" /></button>
+        <div class="brand-copy"><div class="brand-kicker"><span class="eyebrow">ViralVoice Pro</span><span class="version-pill">3.3</span></div><p class="brand-tagline">Studio mobile de doublage IA</p></div>
       </div>
       <h1>Ta vidéo. Une nouvelle langue. La même énergie.</h1>
       <p class="subtitle">Importe ton fichier, choisis les voix, puis récupère directement la vidéo finale prête à publier.</p>
@@ -62,7 +62,7 @@
     </section>
 
     <section class="card workflow-card mix-card" aria-labelledby="mixTitle">
-      <div class="step-heading"><span class="step-number">5</span><div><p class="section-kicker">Son final</p><h2 id="mixTitle">5. Mixage audio</h2></div></div>
+      <div class="step-heading"><span class="step-number">4</span><div><p class="section-kicker">Son final</p><h2 id="mixTitle">4. Mixage audio</h2></div></div>
       <p class="hint">Choisis un rendu rapide. Le mode équilibré convient à la majorité des vidéos.</p>
       <div class="preset-grid" role="radiogroup" aria-label="Préréglages audio">
         <label class="preset-card" for="presetSolo"><input id="presetSolo" name="audioPreset" type="radio" value="solo" /><span class="preset-icon">🎙</span><strong>Voix seule</strong><small>Son original coupé.</small></label>
@@ -73,7 +73,7 @@
       <details class="advanced-audio inline-details"><summary>Réglages audio avancés</summary><label for="voiceVolume">Volume de la voix IA</label><input id="voiceVolume" type="range" min="60" max="130" value="105" /><div class="range-row"><span>Doux</span><strong id="voiceVolumeValue">105%</strong><span>Fort</span></div><label for="originalVolume">Volume du son original</label><input id="originalVolume" type="range" min="0" max="60" value="10" /><div class="range-row"><span>Muet</span><strong id="originalVolumeValue">10%</strong><span>Fond</span></div></details>
     </section>
 
-    <div class="action-dock"><button id="dubBtn" class="primary" type="button">⚡ Créer mon doublage</button><p class="action-caption">La vidéo finale sera téléchargée automatiquement sur Android.</p></div>
+    <div class="action-dock"><button id="dubBtn" class="primary" type="button">⚡ Créer mon doublage</button><p class="action-caption">La traduction est générée en ligne, puis l’APK recale localement les pistes sur Android.</p></div>
 
     <section id="statusCard" class="status processing-card hidden" aria-live="polite"><div class="processing-topline"><div class="loader"></div><div><strong>ViralVoice travaille</strong><p id="statusText">Traitement en cours...</p></div></div><div class="processing-steps" aria-hidden="true"><span data-stage="wake">Connexion</span><span data-stage="transcribe">Transcription</span><span data-stage="voice">Voix IA</span><span data-stage="final">Finalisation</span></div></section>
     <div id="userStatus" class="notice user-status hidden">Service en attente.</div>
@@ -96,8 +96,8 @@
       <h3 class="admin-subtitle">Backend Render</h3><label for="backendUrl">URL backend Render</label><input id="backendUrl" type="url" placeholder="https://viralvoice.onrender.com" autocomplete="off" /><div class="actions two"><button id="saveBackendBtn" class="secondary" type="button">Sauvegarder</button><button id="testBackendBtn" class="secondary" type="button">Tester</button></div><div id="backendStatus" class="notice">Service en attente.</div>
       <h3 class="admin-subtitle">Liens de paiement</h3><label for="payDecouverte">Lien Découverte</label><input id="payDecouverte" type="url" placeholder="Lien du pack Découverte" /><label for="payCreateur">Lien Créateur</label><input id="payCreateur" type="url" placeholder="Lien du pack Créateur" /><label for="payViral">Lien Viral</label><input id="payViral" type="url" placeholder="Lien du pack Viral" /><label for="payPro">Lien Pro</label><input id="payPro" type="url" placeholder="Lien du pack Pro" /><button id="savePaymentLinksBtn" class="secondary full" type="button">Sauvegarder les liens</button><h3 class="admin-subtitle">Demandes sur ce téléphone</h3><div id="paymentRequestsList" class="payment-requests"></div>
     </section>
-    <footer class="app-footer"><strong>ViralVoice Pro 3.2</strong><span>Doublage IA · Multi-voix · Lip-sync</span></footer>
+    <footer class="app-footer"><strong>ViralVoice Pro 3.3</strong><span>Traduction IA · Multi-voix · Recalage Android</span></footer>
   </main>
-  <script src="script.js?v=20260731v320"></script><script src="speaker-sync.js?v=20260731v320"></script><script src="audio-presets.js?v=20260731v320"></script><script src="admin-access.js?v=20260731v320"></script><script src="pro-refonte.js?v=20260731v320"></script>
+  <script src="script.js?v=20260731v330"></script><script src="speaker-sync.js?v=20260731v330"></script><script src="audio-presets.js?v=20260731v330"></script><script src="admin-access.js?v=20260731v330"></script><script src="pro-refonte.js?v=20260731v330"></script>
 </body>
 </html>
