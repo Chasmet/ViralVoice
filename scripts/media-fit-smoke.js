@@ -7,10 +7,10 @@ const media = require('../lib/media');
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
-function createTone(outputPath) {
+function createTone(outputPath, frequency, duration) {
   return new Promise((resolve, reject) => {
     ffmpeg()
-      .input('sine=frequency=440:duration=1.4')
+      .input(`sine=frequency=${frequency}:duration=${duration}`)
       .inputFormat('lavfi')
       .audioCodec('pcm_s16le')
       .audioChannels(1)
@@ -22,31 +22,64 @@ function createTone(outputPath) {
   });
 }
 
+async function assertDuration(filePath, expected, tolerance, label) {
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).size < 1000) {
+    throw new Error(`${label} absent ou vide.`);
+  }
+
+  const info = await media.getMediaInfo(filePath);
+  const difference = Math.abs(info.duration - expected);
+  if (!Number.isFinite(info.duration) || difference > tolerance) {
+    throw new Error(
+      `${label} : durée ${info.duration}s au lieu de ${expected}s.`
+    );
+  }
+
+  return info;
+}
+
 async function main() {
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'viralvoice-fit-'));
-  const sourcePath = path.join(workDir, 'source.wav');
-  const fittedPath = path.join(workDir, 'fitted.wav');
-  const targetDuration = 2.2;
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'viralvoice-media-'));
+  const sourceA = path.join(workDir, 'source-a.wav');
+  const sourceB = path.join(workDir, 'source-b.wav');
+  const fittedA = path.join(workDir, 'fitted-a.wav');
+  const fittedB = path.join(workDir, 'fitted-b.wav');
+  const silentBed = path.join(workDir, 'silent.wav');
+  const timeline = path.join(workDir, 'timeline.mp3');
+  const totalDuration = 4.5;
 
   try {
-    await createTone(sourcePath);
-    await media.fitVoiceToDuration(sourcePath, fittedPath, targetDuration);
+    await createTone(sourceA, 440, 1.4);
+    await createTone(sourceB, 660, 0.9);
 
-    if (!fs.existsSync(fittedPath) || fs.statSync(fittedPath).size < 1000) {
-      throw new Error('Le fichier audio recalé est absent ou vide.');
-    }
+    await media.fitVoiceToDuration(sourceA, fittedA, 1.8);
+    await media.fitVoiceToDuration(sourceB, fittedB, 1.1);
 
-    const info = await media.getMediaInfo(fittedPath);
-    const difference = Math.abs(info.duration - targetDuration);
-    if (!Number.isFinite(info.duration) || difference > 0.12) {
-      throw new Error(
-        `Durée incorrecte : ${info.duration}s au lieu de ${targetDuration}s.`
-      );
-    }
+    await assertDuration(fittedA, 1.8, 0.12, 'Premier segment recalé');
+    await assertDuration(fittedB, 1.1, 0.12, 'Second segment recalé');
+
+    await media.createSilentAudio(silentBed, totalDuration);
+    await media.renderSpeakerTimeline(
+      silentBed,
+      [
+        { start: 0.25, audioPath: fittedA },
+        { start: 1.55, audioPath: fittedB },
+        { start: 2.75, audioPath: fittedA }
+      ],
+      timeline,
+      totalDuration
+    );
+
+    const timelineInfo = await assertDuration(
+      timeline,
+      totalDuration,
+      0.16,
+      'Timeline multi-voix'
+    );
 
     console.log(
-      `FFmpeg media-fit OK: ${info.duration.toFixed(3)}s, ` +
-      `${fs.statSync(fittedPath).size} octets.`
+      `FFmpeg multi-voix OK: ${timelineInfo.duration.toFixed(3)}s, ` +
+      `${fs.statSync(timeline).size} octets.`
     );
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
