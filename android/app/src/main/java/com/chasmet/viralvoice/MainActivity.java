@@ -3,14 +3,19 @@ package com.chasmet.viralvoice;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Message;
+import android.util.Log;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
@@ -25,16 +30,53 @@ import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class MainActivity extends Activity {
 
+    private static final String TAG = "ViralVoiceDownload";
     private static final int FILE_CHOOSER_REQUEST = 1001;
+    private static final int MAX_DOWNLOAD_RETRIES = 2;
     private static final String APP_URL =
-            "https://chasmet.github.io/ViralVoice/?app=360";
+            "https://chasmet.github.io/ViralVoice/?app=363";
 
     private WebView webView;
     private ProgressBar progressBar;
     private ValueCallback<Uri[]> filePathCallback;
     private String lastAutomaticDownloadUrl = "";
+    private boolean downloadReceiverRegistered = false;
+
+    private final Map<Long, PendingDownload> pendingDownloads =
+            new ConcurrentHashMap<>();
+
+    private final BroadcastReceiver downloadReceiver =
+            new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (!DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(
+                            intent.getAction()
+                    )) {
+                        return;
+                    }
+
+                    long downloadId = intent.getLongExtra(
+                            DownloadManager.EXTRA_DOWNLOAD_ID,
+                            -1L
+                    );
+                    if (downloadId < 0) {
+                        return;
+                    }
+
+                    PendingDownload pending =
+                            pendingDownloads.remove(downloadId);
+                    if (pending == null) {
+                        return;
+                    }
+
+                    inspectCompletedDownload(downloadId, pending);
+                }
+            };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +88,7 @@ public class MainActivity extends Activity {
 
         configureWebView();
         configureDownloads();
+        registerDownloadReceiver();
 
         if (savedInstanceState == null) {
             webView.clearCache(true);
@@ -74,7 +117,7 @@ public class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setLoadsImagesAutomatically(true);
         settings.setUserAgentString(
-                settings.getUserAgentString() + " ViralVoiceAndroid/3.6"
+                settings.getUserAgentString() + " ViralVoiceAndroid/3.6.3"
         );
 
         CookieManager cookieManager = CookieManager.getInstance();
@@ -159,11 +202,7 @@ public class MainActivity extends Activity {
                     return true;
                 } catch (ActivityNotFoundException error) {
                     filePathCallback = null;
-                    Toast.makeText(
-                            MainActivity.this,
-                            R.string.no_application,
-                            Toast.LENGTH_LONG
-                    ).show();
+                    showToast(R.string.no_application);
                     return false;
                 }
             }
@@ -222,15 +261,13 @@ public class MainActivity extends Activity {
     }
 
     private void openExternal(Uri uri) {
-        try {
-            startActivity(new Intent(Intent.ACTION_VIEW, uri));
-        } catch (ActivityNotFoundException error) {
-            Toast.makeText(
-                    this,
-                    R.string.no_application,
-                    Toast.LENGTH_LONG
-            ).show();
-        }
+        runOnUiThread(() -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, uri));
+            } catch (ActivityNotFoundException error) {
+                showToast(R.string.no_application);
+            }
+        });
     }
 
     private void configureDownloads() {
@@ -248,18 +285,41 @@ public class MainActivity extends Activity {
                         userAgent,
                         contentDisposition,
                         mimeType,
-                        false
+                        false,
+                        0,
+                        null,
+                        true
                 );
             }
         });
     }
 
-    private boolean enqueueDownload(
+    private void registerDownloadReceiver() {
+        IntentFilter filter = new IntentFilter(
+                DownloadManager.ACTION_DOWNLOAD_COMPLETE
+        );
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                    downloadReceiver,
+                    filter,
+                    Context.RECEIVER_NOT_EXPORTED
+            );
+        } else {
+            registerReceiver(downloadReceiver, filter);
+        }
+        downloadReceiverRegistered = true;
+    }
+
+    private long enqueueDownload(
             String url,
             String userAgent,
             String contentDisposition,
             String mimeType,
-            boolean automatic
+            boolean automatic,
+            int retryCount,
+            String requestedFileName,
+            boolean announceStart
     ) {
         try {
             Uri uri = Uri.parse(url);
@@ -274,12 +334,18 @@ public class MainActivity extends Activity {
                             ? "application/octet-stream"
                             : mimeType;
 
-            String fileName = sanitizeFileName(
-                    URLUtil.guessFileName(
-                            url,
-                            contentDisposition,
-                            safeMimeType
-                    )
+            String guessedName = requestedFileName;
+            if (guessedName == null || guessedName.trim().isEmpty()) {
+                guessedName = URLUtil.guessFileName(
+                        url,
+                        contentDisposition,
+                        safeMimeType
+                );
+            }
+
+            String fileName = ensureMediaExtension(
+                    sanitizeFileName(guessedName),
+                    safeMimeType
             );
 
             DownloadManager.Request request =
@@ -293,6 +359,11 @@ public class MainActivity extends Activity {
             if (userAgent != null && !userAgent.isEmpty()) {
                 request.addRequestHeader("User-Agent", userAgent);
             }
+            request.addRequestHeader(
+                    "Accept",
+                    safeMimeType + ",application/octet-stream;q=0.9,*/*;q=0.8"
+            );
+            request.addRequestHeader("Referer", APP_URL);
 
             request.setMimeType(safeMimeType);
             request.setTitle(fileName);
@@ -300,6 +371,10 @@ public class MainActivity extends Activity {
                     automatic
                             ? "Vidéo ViralVoice terminée"
                             : "Téléchargement ViralVoice"
+            );
+            request.setAllowedNetworkTypes(
+                    DownloadManager.Request.NETWORK_WIFI
+                            | DownloadManager.Request.NETWORK_MOBILE
             );
             request.setAllowedOverMetered(true);
             request.setAllowedOverRoaming(false);
@@ -311,6 +386,7 @@ public class MainActivity extends Activity {
                     Environment.DIRECTORY_DOWNLOADS,
                     fileName
             );
+            request.allowScanningByMediaScanner();
 
             DownloadManager manager =
                     (DownloadManager) getSystemService(
@@ -322,23 +398,132 @@ public class MainActivity extends Activity {
                 );
             }
 
-            manager.enqueue(request);
-            Toast.makeText(
-                    MainActivity.this,
-                    automatic
-                            ? R.string.auto_download_started
-                            : R.string.download_started,
-                    Toast.LENGTH_LONG
-            ).show();
-            return true;
+            long downloadId = manager.enqueue(request);
+            pendingDownloads.put(
+                    downloadId,
+                    new PendingDownload(
+                            url,
+                            userAgent,
+                            contentDisposition,
+                            safeMimeType,
+                            automatic,
+                            retryCount,
+                            fileName
+                    )
+            );
+
+            if (announceStart) {
+                showToast(
+                        automatic
+                                ? R.string.auto_download_started
+                                : R.string.download_started
+                );
+            }
+
+            return downloadId;
         } catch (Exception error) {
-            Toast.makeText(
-                    MainActivity.this,
-                    R.string.download_failed,
-                    Toast.LENGTH_LONG
-            ).show();
-            return false;
+            Log.e(TAG, "Impossible de lancer le téléchargement", error);
+            if (announceStart) {
+                showToast(R.string.download_failed);
+            }
+            return -1L;
         }
+    }
+
+    private void inspectCompletedDownload(
+            long downloadId,
+            PendingDownload pending
+    ) {
+        DownloadManager manager =
+                (DownloadManager) getSystemService(
+                        Context.DOWNLOAD_SERVICE
+                );
+        if (manager == null) {
+            handleFinalDownloadFailure(pending);
+            return;
+        }
+
+        DownloadManager.Query query =
+                new DownloadManager.Query().setFilterById(downloadId);
+
+        try (Cursor cursor = manager.query(query)) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                retryOrFallback(pending, -1);
+                return;
+            }
+
+            int statusIndex = cursor.getColumnIndex(
+                    DownloadManager.COLUMN_STATUS
+            );
+            int reasonIndex = cursor.getColumnIndex(
+                    DownloadManager.COLUMN_REASON
+            );
+            int status = statusIndex >= 0
+                    ? cursor.getInt(statusIndex)
+                    : DownloadManager.STATUS_FAILED;
+            int reason = reasonIndex >= 0 ? cursor.getInt(reasonIndex) : -1;
+
+            if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                showToast(R.string.download_complete);
+                return;
+            }
+
+            retryOrFallback(pending, reason);
+        } catch (Exception error) {
+            Log.e(TAG, "Lecture du statut du téléchargement impossible", error);
+            retryOrFallback(pending, -1);
+        }
+    }
+
+    private void retryOrFallback(
+            PendingDownload pending,
+            int reason
+    ) {
+        Log.w(
+                TAG,
+                "Téléchargement échoué, raison=" + reason
+                        + ", tentative=" + pending.retryCount
+        );
+
+        if (pending.retryCount < MAX_DOWNLOAD_RETRIES) {
+            showToast(R.string.download_retry);
+            long retryId = enqueueDownload(
+                    pending.url,
+                    pending.userAgent,
+                    pending.contentDisposition,
+                    pending.mimeType,
+                    pending.automatic,
+                    pending.retryCount + 1,
+                    pending.fileName,
+                    false
+            );
+            if (retryId >= 0) {
+                return;
+            }
+        }
+
+        handleFinalDownloadFailure(pending);
+    }
+
+    private void handleFinalDownloadFailure(PendingDownload pending) {
+        showToast(R.string.download_browser_fallback);
+        openExternal(Uri.parse(pending.url));
+    }
+
+    private String ensureMediaExtension(
+            String fileName,
+            String mimeType
+    ) {
+        String lower = fileName.toLowerCase();
+        if ("video/mp4".equalsIgnoreCase(mimeType)
+                && !lower.endsWith(".mp4")) {
+            return fileName + ".mp4";
+        }
+        if ("audio/mpeg".equalsIgnoreCase(mimeType)
+                && !lower.endsWith(".mp3")) {
+            return fileName + ".mp3";
+        }
+        return fileName;
     }
 
     private String sanitizeFileName(String fileName) {
@@ -360,38 +545,78 @@ public class MainActivity extends Activity {
                 : sanitized;
     }
 
+    private void showToast(int stringResource) {
+        runOnUiThread(() -> Toast.makeText(
+                MainActivity.this,
+                stringResource,
+                Toast.LENGTH_LONG
+        ).show());
+    }
+
     private final class ViralVoiceBridge {
         @JavascriptInterface
-        public void download(
+        public boolean download(
                 String url,
                 String fileName,
                 String mimeType
         ) {
-            runOnUiThread(() -> {
-                if (
-                        url == null
-                                || url.trim().isEmpty()
-                                || url.equals(lastAutomaticDownloadUrl)
-                ) {
-                    return;
-                }
+            if (url == null || url.trim().isEmpty()) {
+                return false;
+            }
 
-                String cleanName = sanitizeFileName(fileName);
-                String contentDisposition =
-                        "attachment; filename=\"" + cleanName + "\"";
+            if (url.equals(lastAutomaticDownloadUrl)) {
+                return true;
+            }
 
-                boolean started = enqueueDownload(
-                        url,
-                        webView.getSettings().getUserAgentString(),
-                        contentDisposition,
-                        mimeType,
-                        true
-                );
+            String cleanName = sanitizeFileName(fileName);
+            String contentDisposition =
+                    "attachment; filename=\"" + cleanName + "\"";
 
-                if (started) {
-                    lastAutomaticDownloadUrl = url;
-                }
-            });
+            long downloadId = enqueueDownload(
+                    url,
+                    webView.getSettings().getUserAgentString(),
+                    contentDisposition,
+                    mimeType,
+                    true,
+                    0,
+                    cleanName,
+                    true
+            );
+
+            if (downloadId >= 0) {
+                lastAutomaticDownloadUrl = url;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    private static final class PendingDownload {
+        final String url;
+        final String userAgent;
+        final String contentDisposition;
+        final String mimeType;
+        final boolean automatic;
+        final int retryCount;
+        final String fileName;
+
+        PendingDownload(
+                String url,
+                String userAgent,
+                String contentDisposition,
+                String mimeType,
+                boolean automatic,
+                int retryCount,
+                String fileName
+        ) {
+            this.url = url;
+            this.userAgent = userAgent;
+            this.contentDisposition = contentDisposition;
+            this.mimeType = mimeType;
+            this.automatic = automatic;
+            this.retryCount = retryCount;
+            this.fileName = fileName;
         }
     }
 
@@ -442,6 +667,15 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (downloadReceiverRegistered) {
+            try {
+                unregisterReceiver(downloadReceiver);
+            } catch (IllegalArgumentException ignored) {
+                // Récepteur déjà retiré.
+            }
+            downloadReceiverRegistered = false;
+        }
+
         if (filePathCallback != null) {
             filePathCallback.onReceiveValue(null);
             filePathCallback = null;

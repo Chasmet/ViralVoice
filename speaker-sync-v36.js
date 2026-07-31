@@ -2,7 +2,7 @@
   'use strict';
 
   const nativeFetch = window.fetch.bind(window);
-  const VERSION = '20260731v360';
+  const VERSION = '20260731v363';
   const autoDownloadedUrls = new Set();
 
   removeLegacyLipSyncUi();
@@ -76,7 +76,6 @@
     }
 
     if (!mediaUrl.startsWith('https://') || autoDownloadedUrls.has(mediaUrl)) return;
-    autoDownloadedUrls.add(mediaUrl);
 
     const isVideo = Boolean(data?.dubbedVideoUrl);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -85,25 +84,65 @@
       : `ViralVoice-Premium-${timestamp}.mp3`;
     const mimeType = isVideo ? 'video/mp4' : 'audio/mpeg';
 
-    try {
-      if (
-        window.ViralVoiceAndroid &&
-        typeof window.ViralVoiceAndroid.download === 'function'
-      ) {
-        window.ViralVoiceAndroid.download(mediaUrl, fileName, mimeType);
-        return;
-      }
-    } catch (error) {
-      console.warn('Pont Android indisponible', error);
+    if (launchNativeDownload(mediaUrl, fileName, mimeType)) {
+      autoDownloadedUrls.add(mediaUrl);
+      announceAutomaticDownload();
+      return;
     }
 
-    const link = document.createElement('a');
-    link.href = mediaUrl;
-    link.download = fileName;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    window.setTimeout(() => link.remove(), 1000);
+    if (launchBrowserDownload(mediaUrl, fileName)) {
+      autoDownloadedUrls.add(mediaUrl);
+      announceAutomaticDownload();
+    }
+  }
+
+  function launchNativeDownload(mediaUrl, fileName, mimeType) {
+    try {
+      if (
+        !window.ViralVoiceAndroid ||
+        typeof window.ViralVoiceAndroid.download !== 'function'
+      ) {
+        return false;
+      }
+
+      const accepted = window.ViralVoiceAndroid.download(
+        mediaUrl,
+        fileName,
+        mimeType
+      );
+
+      return accepted === true || accepted === 'true' || accepted === 1;
+    } catch (error) {
+      console.warn('Pont Android indisponible', error);
+      return false;
+    }
+  }
+
+  function launchBrowserDownload(mediaUrl, fileName) {
+    try {
+      const link = document.createElement('a');
+      link.href = mediaUrl;
+      link.download = fileName;
+      link.rel = 'noopener';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      window.setTimeout(() => link.remove(), 1500);
+      return true;
+    } catch (error) {
+      console.warn('Téléchargement navigateur indisponible', error);
+      return false;
+    }
+  }
+
+  function announceAutomaticDownload() {
+    const speakerInfo = document.getElementById('speakerInfo');
+    if (!speakerInfo) return;
+
+    const message = 'Téléchargement automatique lancé dans le dossier Téléchargements.';
+    if (!speakerInfo.textContent.includes(message)) {
+      speakerInfo.textContent = `${speakerInfo.textContent} · ${message}`;
+    }
   }
 
   function removeLegacyLipSyncUi() {
