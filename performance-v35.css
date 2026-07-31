@@ -1,0 +1,26 @@
+html{scroll-behavior:auto!important}
+body{background:#070a14!important;background-image:none!important}
+body::before,body::after,.app::before,.app::after{display:none!important}
+.card,.status,.vv-space-switch,.workflow-nav,.action-dock{
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  background:#11182d!important;
+  box-shadow:0 5px 16px rgba(0,0,0,.22)!important
+}
+.workflow-nav,.action-dock{
+  position:relative!important;
+  top:auto!important;
+  bottom:auto!important;
+  z-index:2!important
+}
+.pro-hero{background:#0d1427!important}
+.file-zone,.preset-card,.inline-details,.transcript-details,input,select,textarea{
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important
+}
+*{animation-duration:.25s!important;transition-duration:.12s!important}
+.loader{animation-duration:.85s!important}
+.source-preview-hidden{display:none!important}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
