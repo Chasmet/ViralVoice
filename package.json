@@ -1,6 +1,6 @@
 {
   "name": "viralvoice",
-  "version": "3.6.1",
+  "version": "3.6.2",
   "description": "ViralVoice - doublage IA premium multi-intervenants avec adaptation temporelle.",
   "main": "server-v3.js",
   "type": "commonjs",
