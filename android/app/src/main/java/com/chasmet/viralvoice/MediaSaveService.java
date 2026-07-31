@@ -35,6 +35,7 @@ public class MediaSaveService extends Service {
     public static final String EXTRA_MIME_TYPE = "mimeType";
     public static final String EXTRA_USER_AGENT = "userAgent";
     public static final String EXTRA_COOKIES = "cookies";
+    public static final String EXTRA_DESTINATION_URI = "destinationUri";
 
     private static final String TAG = "ViralVoiceSave";
     private static final String CHANNEL_ID = "viralvoice_native_save";
@@ -62,6 +63,13 @@ public class MediaSaveService extends Service {
         String mimeType = intent.getStringExtra(EXTRA_MIME_TYPE);
         String userAgent = intent.getStringExtra(EXTRA_USER_AGENT);
         String cookies = intent.getStringExtra(EXTRA_COOKIES);
+        String destinationUriValue = intent.getStringExtra(
+                EXTRA_DESTINATION_URI
+        );
+        Uri destinationUri = destinationUriValue == null
+                || destinationUriValue.trim().isEmpty()
+                ? null
+                : Uri.parse(destinationUriValue);
 
         startForeground(
                 FOREGROUND_NOTIFICATION_ID,
@@ -75,7 +83,8 @@ public class MediaSaveService extends Service {
                         fileName,
                         mimeType,
                         userAgent,
-                        cookies
+                        cookies,
+                        destinationUri
                 );
                 showSuccessNotification(saved, startId);
             } catch (Exception error) {
@@ -95,7 +104,8 @@ public class MediaSaveService extends Service {
             String fileName,
             String mimeType,
             String userAgent,
-            String cookies
+            String cookies,
+            Uri destinationUri
     ) throws Exception {
         Exception lastError = null;
 
@@ -106,7 +116,8 @@ public class MediaSaveService extends Service {
                         fileName,
                         mimeType,
                         userAgent,
-                        cookies
+                        cookies,
+                        destinationUri
                 );
             } catch (Exception error) {
                 lastError = error;
@@ -127,7 +138,8 @@ public class MediaSaveService extends Service {
             String requestedName,
             String requestedMime,
             String userAgent,
-            String cookies
+            String cookies,
+            Uri destinationUri
     ) throws Exception {
         if (sourceUrl == null || !sourceUrl.startsWith("https://")) {
             throw new IllegalArgumentException("URL de média invalide");
@@ -176,6 +188,26 @@ public class MediaSaveService extends Service {
                     connection.getInputStream(),
                     64 * 1024
             )) {
+                if (destinationUri != null) {
+                    ContentResolver resolver = getContentResolver();
+                    try (OutputStream output = new BufferedOutputStream(
+                            resolver.openOutputStream(destinationUri, "w"),
+                            64 * 1024
+                    )) {
+                        if (output == null) {
+                            throw new IllegalStateException(
+                                    "Le gestionnaire de fichiers refuse l’écriture"
+                            );
+                        }
+                        copy(input, output);
+                    }
+                    return new SavedMedia(
+                            destinationUri,
+                            fileName,
+                            mimeType
+                    );
+                }
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     insertedUri = createMediaStoreEntry(fileName, mimeType);
                     if (insertedUri == null) {
@@ -442,8 +474,7 @@ public class MediaSaveService extends Service {
                 .setContentText(saved.fileName)
                 .setAutoCancel(true);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                && "content".equals(saved.uri.getScheme())) {
+        if ("content".equals(saved.uri.getScheme())) {
             Intent openIntent = new Intent(Intent.ACTION_VIEW)
                     .setDataAndType(saved.uri, saved.mimeType)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
