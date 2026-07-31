@@ -15,7 +15,8 @@
 
   let resultWasVisible = false;
 
-  prepareLipSyncCard();
+  removeLegacyLipSyncUi();
+  renumberMixSection();
   hideSourcePreviews();
   syncBodyState();
 
@@ -35,19 +36,18 @@
     });
   }
 
-  if (copyTextBtn) {
-    copyTextBtn.addEventListener('click', copyTranslation);
-  }
-
-  if (newDubBtn) {
-    newDubBtn.addEventListener('click', startNewProject);
-  }
+  if (copyTextBtn) copyTextBtn.addEventListener('click', copyTranslation);
+  if (newDubBtn) newDubBtn.addEventListener('click', startNewProject);
 
   const observer = new MutationObserver(() => {
+    removeLegacyLipSyncUi();
+    renumberMixSection();
     hideSourcePreviews();
     syncBodyState();
     updateProcessingStage();
   });
+
+  observer.observe(document.body, { childList: true, subtree: true });
 
   [statusCard, resultCard].filter(Boolean).forEach(element => {
     observer.observe(element, { attributes: true, attributeFilter: ['class'] });
@@ -71,6 +71,27 @@
     });
   }
 
+  function removeLegacyLipSyncUi() {
+    document.querySelectorAll('.lip-sync-card').forEach(card => card.remove());
+
+    document.querySelectorAll('.notice, .status, [role="alert"]').forEach(element => {
+      const text = String(element.textContent || '');
+      if (/LIPSYNC_SERVICE_URL|lip-sync indisponible|musetalk|GPU à configurer/i.test(text)) {
+        element.textContent = '';
+        element.classList.add('hidden');
+      }
+    });
+  }
+
+  function renumberMixSection() {
+    const mixTitle = document.getElementById('mixTitle');
+    const mixCard = mixTitle?.closest('section.card');
+    const marker = mixCard?.querySelector('.step-number');
+
+    if (mixTitle) mixTitle.textContent = '4. Mixage audio';
+    if (marker) marker.textContent = '4';
+  }
+
   function syncBodyState() {
     const hasFile = Boolean(mediaFile && mediaFile.files && mediaFile.files.length);
     const processing = Boolean(statusCard && !statusCard.classList.contains('hidden'));
@@ -80,9 +101,7 @@
     document.body.classList.toggle('is-processing', processing);
     document.body.classList.toggle('has-result', hasResult);
 
-    if (projectCard) {
-      projectCard.classList.toggle('file-selected', hasFile);
-    }
+    if (projectCard) projectCard.classList.toggle('file-selected', hasFile);
 
     if (hasResult && !resultWasVisible) {
       resultWasVisible = true;
@@ -92,9 +111,7 @@
       }, 180);
     }
 
-    if (!hasResult) {
-      resultWasVisible = false;
-    }
+    if (!hasResult) resultWasVisible = false;
   }
 
   function updateProcessingStage() {
@@ -106,7 +123,12 @@
 
     if (message.includes('transcription') || message.includes('traduction')) activeIndex = 1;
     if (message.includes('voix ia') || message.includes('création de la voix')) activeIndex = 2;
-    if (message.includes('final') || message.includes('préparation du fichier') || message.includes('terminé')) activeIndex = 3;
+    if (
+      message.includes('final') ||
+      message.includes('préparation du fichier') ||
+      message.includes('synchronisation locale') ||
+      message.includes('terminé')
+    ) activeIndex = 3;
 
     stages.forEach((stage, index) => {
       stage.classList.toggle('done', index < activeIndex);
@@ -134,9 +156,7 @@
   }
 
   function startNewProject() {
-    if (typeof window.resetResult === 'function') {
-      window.resetResult();
-    }
+    if (typeof window.resetResult === 'function') window.resetResult();
 
     if (mediaFile) {
       mediaFile.value = '';
@@ -161,41 +181,5 @@
     }, 1600);
   }
 
-  function prepareLipSyncCard() {
-    const card = document.querySelector('.lip-sync-card');
-    if (!card || card.dataset.refonteReady === 'true') return;
-
-    card.dataset.refonteReady = 'true';
-    card.classList.add('workflow-card');
-
-    const title = card.querySelector('h2');
-    if (title) title.textContent = '4. Synchronisation des lèvres';
-
-    const sectionTitle = card.querySelector('.section-title');
-    if (sectionTitle && !sectionTitle.querySelector('.step-number')) {
-      const marker = document.createElement('span');
-      marker.className = 'step-number';
-      marker.textContent = '4';
-      sectionTitle.prepend(marker);
-    }
-
-    const grid = card.querySelector('.grid');
-    const hint = card.querySelector('#lipSyncHint');
-
-    if (grid) {
-      const details = document.createElement('details');
-      details.className = 'inline-details lip-advanced-details';
-      const summary = document.createElement('summary');
-      summary.textContent = 'Réglages avancés du lip-sync';
-      details.appendChild(summary);
-      details.appendChild(grid);
-      if (hint) details.appendChild(hint);
-      card.appendChild(details);
-    }
-
-    const mixTitle = document.getElementById('mixTitle');
-    if (mixTitle) mixTitle.textContent = '5. Mixage audio';
-  }
-
-  window.VIRALVOICE_UI_VERSION = '3.2.0';
+  window.VIRALVOICE_UI_VERSION = '3.3.0';
 })();
