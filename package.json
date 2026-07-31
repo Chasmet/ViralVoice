@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "latest",
+    "@ffprobe-installer/ffprobe": "latest",
     "@supabase/supabase-js": "latest",
     "cors": "latest",
     "dotenv": "latest",
