@@ -34,14 +34,14 @@ app.use(express.static(config.PUBLIC_DIR));
 app.get('/', (req, res) => res.json({
   ok: true,
   app: 'ViralVoice API',
-  version: '3.5.0-auto-voice-profile'
+  version: '3.6.0-premium-dubbing'
 }));
 
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     app: 'ViralVoice API',
-    version: '3.5.0-auto-voice-profile',
+    version: '3.6.0-premium-dubbing',
     openaiKey: Boolean(process.env.OPENAI_API_KEY),
     supabase: db.isConfigured(),
     adminSecret: Boolean(config.ADMIN_SECRET),
@@ -53,9 +53,12 @@ app.get('/api/health', (req, res) => {
     transcriptionModel: config.TRANSCRIBE_MODEL,
     diarizationModel: config.DIARIZE_MODEL,
     translationModel: config.TEXT_MODEL,
-    ttsModel: config.TTS_MODEL,
+    translationFallbackModel: config.TEXT_FALLBACK_MODEL,
+    translationReasoningEffort: config.TEXT_REASONING_EFFORT,
+    audioDubModel: config.AUDIO_DUB_MODEL,
+    ttsFallbackModel: config.TTS_FALLBACK_MODEL,
     voiceProfileModel: config.VOICE_PROFILE_MODEL,
-    syncMode: 'speaker-segments-with-automatic-voice-profile'
+    syncMode: 'duration-adapted-speaker-segments'
   });
 });
 
@@ -228,6 +231,9 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
     });
 
     const prepared = [];
+    const voiceEngines = new Set();
+    let voiceFallbackSegments = 0;
+
     for (let index = 0; index < translated.length; index += 1) {
       const segment = translated[index];
       const slotDuration = Math.max(0.25, segment.end - segment.start);
@@ -243,18 +249,23 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
         speakerProfiles
       );
 
-      await speech.generateVoiceSegment({
+      const voiceResult = await speech.generateVoiceSegment({
         text: segment.translatedText,
         voice,
         outputPath: rawPath,
         slotDuration,
-        role
+        role,
+        delivery: segment.delivery,
+        pace: segment.pace
       });
+      voiceEngines.add(voiceResult.engine);
+      if (voiceResult.fallback) voiceFallbackSegments += 1;
 
       await media.fitVoiceToDuration(rawPath, fitPath, slotDuration);
       prepared.push({
         ...segment,
         voice,
+        voiceEngine: voiceResult.engine,
         voiceProfile: speakerProfiles[segment.speaker]?.profile || 'neutral',
         audioPath: fitPath
       });
@@ -262,7 +273,8 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
       console.log(
         `[${jobId}] SEGMENT ${index + 1}/${translated.length} ` +
         `${segment.speaker} ${segment.start.toFixed(2)}-${segment.end.toFixed(2)} ` +
-        `${role}/${voice}`
+        `${role}/${voice}/${voiceResult.engine} ` +
+        `words=${speech.countWords(segment.translatedText)}/${segment.wordBudget}`
       );
     }
 
@@ -290,8 +302,16 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
           ? 'automatic-audio-profile'
           : 'manual-first-speaker',
       synchronizedSegments: prepared.length,
-      syncMode: 'speaker-segments-with-automatic-voice-profile',
+      durationAdaptedSegments: translated.filter(
+        item => speech.countWords(item.translatedText) <= item.wordBudget + 2
+      ).length,
+      syncMode: 'duration-adapted-speaker-segments',
       transcriptionMode: transcription.mode,
+      transcriptionModel: config.DIARIZE_MODEL,
+      translationModel: config.TEXT_MODEL,
+      audioDubModel: config.AUDIO_DUB_MODEL,
+      voiceEngines: [...voiceEngines],
+      voiceFallbackSegments,
       warning: transcription.warning || null,
       lipSyncRequested: false,
       lipSyncUsed: false,
@@ -313,8 +333,8 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
 
     await db.recordGeneration({
       clientId: chargedClient.id,
-      prompt: `Doublage multi-voix automatique vers ${options.targetLanguage}`,
-      voiceStyle: payload.multiVoiceUsed ? 'auto-profile-multi-speaker' : options.selectedVoice,
+      prompt: `Doublage premium adapté vers ${options.targetLanguage}`,
+      voiceStyle: payload.multiVoiceUsed ? 'premium-auto-profile' : options.selectedVoice,
       resultUrl: payload.dubbedVideoUrl || payload.dubbedAudioUrl,
       status: adminFreeMode ? 'admin_free' : 'completed',
       tokensUsed: adminFreeMode ? 0 : minutesNeeded
@@ -472,5 +492,5 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(config.PORT, () => {
-  console.log(`ViralVoice 3.5 démarré sur ${config.PORT}`);
+  console.log(`ViralVoice 3.6 démarré sur ${config.PORT}`);
 });
