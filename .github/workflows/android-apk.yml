@@ -98,6 +98,27 @@ jobs:
           git commit -m "Publish ViralVoice Android APK ${GITHUB_SHA}"
           git push --force origin HEAD:apk-builds
 
+      - name: Create or update GitHub Release
+        if: github.event_name == 'push' && steps.build.outputs.result == '0'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.0"
+          TITLE="ViralVoice v1.0.0"
+          NOTES="Première version publique de ViralVoice pour Android. Téléchargez le fichier ViralVoice-debug.apk puis autorisez l'installation depuis votre navigateur si Android le demande."
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" ViralVoice-debug.apk --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --latest
+          else
+            gh release create "$TAG" ViralVoice-debug.apk \
+              --target main \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --latest
+          fi
+
       - name: Mark failed build
         if: steps.build.outputs.result != '0'
         run: exit 1
