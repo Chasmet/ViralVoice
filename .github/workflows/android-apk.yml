@@ -104,9 +104,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.0"
-          TITLE="ViralVoice v1.0.0"
-          NOTES="Première version publique de ViralVoice pour Android. Téléchargez le fichier ViralVoice-debug.apk puis autorisez l'installation depuis votre navigateur si Android le demande."
+          TAG="v3.6.5"
+          TITLE="ViralVoice v3.6.5"
+          NOTES="Version publique Android de ViralVoice 3.6.5. Téléchargez ViralVoice-debug.apk puis autorisez l'installation depuis votre navigateur si Android le demande."
+
+          if gh release view "v1.0.0" >/dev/null 2>&1; then
+            gh release delete "v1.0.0" --cleanup-tag --yes
+          fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" ViralVoice-debug.apk --clobber
