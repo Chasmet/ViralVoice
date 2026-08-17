@@ -51,3 +51,27 @@ android {
         checkReleaseBuilds true
     }
 }
+
+// V4.0.2 : la source historique MainActivity contient encore les marqueurs 3.6.5.
+// Le build remplace ces marqueurs avant compilation afin de casser le cache WebView
+// et de charger explicitement le runtime 4.0.2 sans modifier les fonctions de sauvegarde.
+tasks.configureEach { task ->
+    if (task.name == 'preDebugBuild' || task.name == 'preReleaseBuild') {
+        task.doFirst {
+            def mainActivity = file('src/main/java/com/chasmet/viralvoice/MainActivity.java')
+            if (!mainActivity.exists()) {
+                throw new GradleException('MainActivity.java introuvable')
+            }
+
+            def source = mainActivity.getText('UTF-8')
+            source = source
+                    .replace('https://chasmet.github.io/ViralVoice/?app=365',
+                            'https://chasmet.github.io/ViralVoice/?app=402')
+                    .replace('ViralVoiceAndroid/3.6.5', 'ViralVoiceAndroid/4.0.2')
+                    .replace('settings.setCacheMode(WebSettings.LOAD_DEFAULT);',
+                            'settings.setCacheMode(WebSettings.LOAD_NO_CACHE);')
+
+            mainActivity.write(source, 'UTF-8')
+        }
+    }
+}
