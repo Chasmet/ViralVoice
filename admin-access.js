@@ -1,11 +1,9 @@
 (() => {
   const ADMIN_EMAIL = 'skypieachannel@gmail.com';
-
   const CLIENT_EMAIL_KEY = 'viralvoice-client-email';
   const ADMIN_SECRET_KEY = 'viralvoice-admin-secret';
   const ADMIN_FREE_MODE_KEY = 'viralvoice-admin-free-mode';
-  const ADMIN_COST_LOG_KEY = 'viralvoice-admin-api-cost-log-v1';
-  const MAX_COST_LOGS = 50;
+  const DEFAULT_BACKEND_URL = 'https://viralvoice.onrender.com';
 
   const clientEmail = document.getElementById('clientEmail');
   const adminPanel = document.getElementById('adminPanel');
@@ -16,6 +14,9 @@
   const adminFreeMode = document.getElementById('adminFreeMode');
   const dubBtn = document.getElementById('dubBtn');
 
+  let costRows = [];
+  let costSummary = null;
+
   function cleanEmail(value) {
     return String(value || '').trim().toLowerCase();
   }
@@ -24,37 +25,29 @@
     return String(value || '').trim();
   }
 
+  function isAdminEmail() {
+    return cleanEmail(clientEmail?.value) === ADMIN_EMAIL;
+  }
+
   function showMessage(message, type = 'success') {
     if (!walletStatus) return;
-
     walletStatus.textContent = message;
     walletStatus.className = 'notice';
     walletStatus.classList.add(type);
     walletStatus.classList.remove('hidden');
   }
 
-  function isAdminEmail() {
-    return cleanEmail(clientEmail?.value) === ADMIN_EMAIL;
-  }
-
   function restoreAdminSecretInput() {
     if (!adminSecretInput) return;
-
     const savedSecret = cleanSecret(localStorage.getItem(ADMIN_SECRET_KEY));
-
-    if (savedSecret && !adminSecretInput.value) {
-      adminSecretInput.value = savedSecret;
-    }
+    if (savedSecret && !adminSecretInput.value) adminSecretInput.value = savedSecret;
   }
 
   function restoreAdminFreeMode() {
     if (!adminFreeMode) return;
-
     const isFreeMode = localStorage.getItem(ADMIN_FREE_MODE_KEY) === 'true';
     adminFreeMode.checked = isFreeMode;
-
     document.body.classList.toggle('admin-free-active', isFreeMode);
-
     if (dubBtn) {
       dubBtn.textContent = isFreeMode
         ? '⚡ Créer gratuitement en admin'
@@ -64,75 +57,50 @@
 
   function saveCurrentAdminSecret() {
     if (!adminSecretInput) return '';
-
     const secret = cleanSecret(adminSecretInput.value);
-
-    if (secret) {
-      localStorage.setItem(ADMIN_SECRET_KEY, secret);
-    }
-
+    if (secret) localStorage.setItem(ADMIN_SECRET_KEY, secret);
     return secret;
+  }
+
+  function currentBackend() {
+    const field = document.getElementById('backendUrl');
+    const value = String(field?.value || localStorage.getItem('viralvoice-backend-url') || '')
+      .trim().replace(/\/+$/, '');
+    return value.startsWith('https://') ? value : DEFAULT_BACKEND_URL;
   }
 
   function openAdminPanel() {
     if (!adminPanel || !isAdminEmail()) return;
-
     adminPanel.classList.remove('hidden');
     document.body.classList.add('admin-email-active');
-
-    if (adminClientEmail && !adminClientEmail.value) {
-      adminClientEmail.value = ADMIN_EMAIL;
-    }
-
+    if (adminClientEmail && !adminClientEmail.value) adminClientEmail.value = ADMIN_EMAIL;
     restoreAdminSecretInput();
     restoreAdminFreeMode();
-    renderAdminCostLogs();
-
+    loadAdminCostLogs();
     showMessage('Admin détecté. Mode admin visible.', 'success');
   }
 
   function closeAdminPanel(options = {}) {
     const { clearSecret = false } = options;
-
-    if (adminPanel) {
-      adminPanel.classList.add('hidden');
-    }
-
-    document.body.classList.remove('admin-email-active');
-    document.body.classList.remove('admin-free-active');
-
-    if (adminFreeMode) {
-      adminFreeMode.checked = false;
-    }
-
-    if (dubBtn) {
-      dubBtn.textContent = '⚡ Créer mon doublage';
-    }
-
+    adminPanel?.classList.add('hidden');
+    document.body.classList.remove('admin-email-active', 'admin-free-active');
+    if (adminFreeMode) adminFreeMode.checked = false;
+    if (dubBtn) dubBtn.textContent = '⚡ Créer mon doublage';
     localStorage.removeItem(ADMIN_FREE_MODE_KEY);
-
     if (clearSecret) {
       localStorage.removeItem(ADMIN_SECRET_KEY);
-
-      if (adminSecretInput) {
-        adminSecretInput.value = '';
-      }
+      if (adminSecretInput) adminSecretInput.value = '';
     }
   }
 
   function logoutUser() {
-    if (clientEmail) {
-      clientEmail.value = '';
-    }
-
+    if (clientEmail) clientEmail.value = '';
     localStorage.removeItem(CLIENT_EMAIL_KEY);
-
     if (walletBadge) {
       walletBadge.textContent = '0 min';
       walletBadge.classList.remove('ok-badge');
       walletBadge.classList.add('muted-badge');
     }
-
     closeAdminPanel({ clearSecret: false });
     showMessage('Utilisateur déconnecté.', 'warning');
   }
@@ -143,35 +111,27 @@
   }
 
   function addLogoutButtons() {
-    const accountCard = document.querySelector('.account-card');
-    const accountActions = accountCard?.querySelector('.actions.two');
-
+    const accountActions = document.querySelector('.account-card .actions.two');
     if (accountActions && !document.getElementById('logoutUserBtn')) {
-      const userButton = document.createElement('button');
-      userButton.id = 'logoutUserBtn';
-      userButton.type = 'button';
-      userButton.className = 'secondary full';
-      userButton.textContent = 'Déconnexion utilisateur';
-      userButton.addEventListener('click', logoutUser);
-
-      accountActions.insertAdjacentElement('afterend', userButton);
+      const button = document.createElement('button');
+      button.id = 'logoutUserBtn';
+      button.type = 'button';
+      button.className = 'secondary full';
+      button.textContent = 'Déconnexion utilisateur';
+      button.addEventListener('click', logoutUser);
+      accountActions.insertAdjacentElement('afterend', button);
     }
 
     if (adminPanel && !document.getElementById('logoutAdminBtn')) {
-      const adminButton = document.createElement('button');
-      adminButton.id = 'logoutAdminBtn';
-      adminButton.type = 'button';
-      adminButton.className = 'secondary full';
-      adminButton.textContent = 'Déconnexion admin';
-      adminButton.addEventListener('click', logoutAdmin);
-
+      const button = document.createElement('button');
+      button.id = 'logoutAdminBtn';
+      button.type = 'button';
+      button.className = 'secondary full';
+      button.textContent = 'Déconnexion admin';
+      button.addEventListener('click', logoutAdmin);
       const firstHint = adminPanel.querySelector('.hint');
-
-      if (firstHint) {
-        firstHint.insertAdjacentElement('afterend', adminButton);
-      } else {
-        adminPanel.prepend(adminButton);
-      }
+      if (firstHint) firstHint.insertAdjacentElement('afterend', button);
+      else adminPanel.prepend(button);
     }
   }
 
@@ -194,26 +154,24 @@
       adminFreeSmall.textContent = 'Quand ce mode est actif, tes doublages sont illimités et ne consomment aucune minute.';
     }
 
-    const subtitles = Array.from(document.querySelectorAll('.admin-subtitle'));
-    const addTitle = subtitles.find(item => item.textContent.toLowerCase().includes('ajouter'));
+    const addTitle = Array.from(document.querySelectorAll('.admin-subtitle'))
+      .find(item => item.textContent.toLowerCase().includes('ajouter'));
     if (addTitle) addTitle.textContent = 'Ajouter des minutes à un client';
 
     const plans = {
-      decouverte: { price: '1,99 €', minutes: '5 minutes' },
-      createur: { price: '6,99 €', minutes: '30 minutes' },
-      viral: { price: '11,99 €', minutes: '60 minutes' },
-      pro: { price: '29,99 €', minutes: '180 minutes' }
+      decouverte: ['1,99 €', '5 minutes'],
+      createur: ['6,99 €', '30 minutes'],
+      viral: ['11,99 €', '60 minutes'],
+      pro: ['29,99 €', '180 minutes']
     };
-
     document.querySelectorAll('.buy-btn').forEach(button => {
-      const plan = plans[button.dataset.plan];
-      const planCard = button.closest('.plan');
-      if (!plan || !planCard) return;
-
-      const priceText = planCard.querySelector('strong');
-      const minuteText = planCard.querySelector('p');
-      if (priceText) priceText.textContent = plan.price;
-      if (minuteText) minuteText.textContent = plan.minutes;
+      const values = plans[button.dataset.plan];
+      const card = button.closest('.plan');
+      if (!values || !card) return;
+      const price = card.querySelector('strong');
+      const minutes = card.querySelector('p');
+      if (price) price.textContent = values[0];
+      if (minutes) minutes.textContent = values[1];
     });
 
     if (walletBadge && walletBadge.textContent.toLowerCase().includes('crédit')) {
@@ -221,38 +179,19 @@
     }
   }
 
-  function handleClientEmailInput() {
-    if (!clientEmail) return;
-
-    const email = cleanEmail(clientEmail.value);
-    localStorage.setItem(CLIENT_EMAIL_KEY, email);
-
-    if (email === ADMIN_EMAIL) openAdminPanel();
-  }
-
   function bindAdminSecretProtection() {
-    if (adminSecretInput) {
-      adminSecretInput.addEventListener('input', () => saveCurrentAdminSecret());
-    }
+    adminSecretInput?.addEventListener('input', () => saveCurrentAdminSecret());
+    adminFreeMode?.addEventListener('change', () => {
+      const active = adminFreeMode.checked;
+      localStorage.setItem(ADMIN_FREE_MODE_KEY, active ? 'true' : 'false');
+      if (active) saveCurrentAdminSecret();
+      restoreAdminFreeMode();
+    });
 
-    if (adminFreeMode) {
-      adminFreeMode.addEventListener('change', () => {
-        const isFreeMode = adminFreeMode.checked;
-        localStorage.setItem(ADMIN_FREE_MODE_KEY, isFreeMode ? 'true' : 'false');
-        if (isFreeMode) saveCurrentAdminSecret();
-        restoreAdminFreeMode();
-      });
-    }
-
-    if (dubBtn) {
-      dubBtn.addEventListener('click', () => {
-        const isFreeMode = localStorage.getItem(ADMIN_FREE_MODE_KEY) === 'true';
-        if (isFreeMode) {
-          const secret = saveCurrentAdminSecret();
-          if (!secret) restoreAdminSecretInput();
-        }
-      }, true);
-    }
+    const saveButton = document.getElementById('saveAdminSecretBtn');
+    saveButton?.addEventListener('click', () => {
+      window.setTimeout(loadAdminCostLogs, 100);
+    });
   }
 
   function addAdminCostPanel() {
@@ -264,17 +203,19 @@
       <h3 class="admin-subtitle">Coût API OpenAI</h3>
       <div class="admin-cost-summary">
         <div><small>Dernière génération</small><strong id="adminLastCost">—</strong></div>
-        <div><small>Moyenne / min</small><strong id="adminAverageCost">—</strong></div>
-        <div><small>Cumul journal</small><strong id="adminTotalCost">—</strong></div>
+        <div><small>Moyenne / minute</small><strong id="adminAverageCost">—</strong></div>
+        <div><small>Dépensé aujourd'hui</small><strong id="adminTodayCost">—</strong></div>
       </div>
-      <p class="hint">Estimation privée basée sur le moteur réellement utilisé. La facture OpenAI finale peut varier légèrement.</p>
+      <div class="actions two admin-cost-actions">
+        <button id="refreshAdminCostLogs" class="secondary" type="button">Actualiser les coûts</button>
+        <span id="adminCostStatus" class="hint">Estimation API privée</span>
+      </div>
+      <p class="hint">Toutes les générations clients sont enregistrées ici. Les montants sont des estimations de coût API, pas la facture finale OpenAI.</p>
       <div id="adminCostLogs" class="admin-cost-logs"><p class="hint">Aucune génération mesurée.</p></div>
-      <button id="clearAdminCostLogs" class="secondary full" type="button">Vider le journal de coûts</button>
     `;
 
     const backendTitle = Array.from(adminPanel.querySelectorAll('.admin-subtitle'))
       .find(item => item.textContent.toLowerCase().includes('backend'));
-
     if (backendTitle) backendTitle.insertAdjacentElement('beforebegin', section);
     else adminPanel.appendChild(section);
 
@@ -285,6 +226,7 @@
       .admin-cost-summary>div{padding:12px;border-radius:14px;background:rgba(53,220,255,.06);border:1px solid rgba(80,190,255,.18)}
       .admin-cost-summary small{display:block;color:#9aa8c8;font-size:.68rem;margin-bottom:5px}
       .admin-cost-summary strong{font-size:1.05rem;color:#e9fbff}
+      .admin-cost-actions{align-items:center;margin:8px 0 12px}
       .admin-cost-logs{display:grid;gap:8px;margin:10px 0 12px}
       .admin-cost-row{padding:11px 12px;border-radius:13px;background:#0b1022;border:1px solid rgba(129,158,230,.16)}
       .admin-cost-row-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -293,145 +235,103 @@
       @media(max-width:560px){.admin-cost-summary{grid-template-columns:1fr 1fr}.admin-cost-summary>div:last-child{grid-column:1/-1}}
     `;
     document.head.appendChild(style);
-
-    document.getElementById('clearAdminCostLogs')?.addEventListener('click', () => {
-      localStorage.removeItem(ADMIN_COST_LOG_KEY);
-      renderAdminCostLogs();
-    });
+    document.getElementById('refreshAdminCostLogs')?.addEventListener('click', loadAdminCostLogs);
   }
 
-  function estimateGenerationCost(data) {
-    const durationSeconds = Math.max(1, Number(data?.durationSeconds || 60));
-    const durationMinutes = durationSeconds / 60;
-    const route = String(data?.autoEngine || data?.voiceStyle || 'unknown');
-    const speakers = Math.max(1, Number(data?.speakersDetected || 1));
-    const segments = Math.max(1, Number(data?.synchronizedSegments || 1));
-    const realtime = route.startsWith('realtime-');
-    const breakdown = [];
-    let totalUsd = 0;
+  async function loadAdminCostLogs() {
+    const list = document.getElementById('adminCostLogs');
+    const status = document.getElementById('adminCostStatus');
+    if (!list || !isAdminEmail()) return;
 
-    // Diarisation initiale : estimation conservatrice, car l'API facture aux tokens audio.
-    const diarization = durationMinutes * 0.006;
-    totalUsd += diarization;
-    breakdown.push({ label: 'Diarisation', usd: diarization });
-
-    if (realtime) {
-      // Le moteur ajoute environ 0,8 s de silence de fin par segment pour clôturer la phrase.
-      const realtimeSeconds = durationSeconds + Math.min(segments * 0.8, durationSeconds * 0.35);
-      const realtimeMinutes = realtimeSeconds / 60;
-      const translate = realtimeMinutes * 0.034;
-      const whisper = realtimeMinutes * 0.017;
-      totalUsd += translate + whisper;
-      breakdown.push({ label: 'Realtime Translate', usd: translate });
-      breakdown.push({ label: 'Realtime Whisper', usd: whisper });
-    } else {
-      // Chemin premium segmenté : estimation à partir du tarif audio gpt-audio-1.5.
-      const luna = durationMinutes * 0.003;
-      const profiles = Math.min(speakers, 4) * 0.0015;
-      const premiumAudio = durationMinutes * 0.088;
-      const segmentOverhead = Math.min(0.012, segments * 0.00025);
-      totalUsd += luna + profiles + premiumAudio + segmentOverhead;
-      breakdown.push({ label: 'GPT-5.6 Luna', usd: luna });
-      breakdown.push({ label: 'Profils vocaux', usd: profiles });
-      breakdown.push({ label: 'gpt-audio-1.5', usd: premiumAudio });
-      breakdown.push({ label: 'Segments', usd: segmentOverhead });
+    const secret = cleanSecret(localStorage.getItem(ADMIN_SECRET_KEY) || adminSecretInput?.value);
+    if (!secret) {
+      if (status) status.textContent = 'Mot de passe admin requis';
+      list.innerHTML = '<p class="hint">Sauvegarde ton mot de passe admin pour afficher les coûts.</p>';
+      return;
     }
 
-    const perMinuteUsd = totalUsd / durationMinutes;
-    return {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      createdAt: new Date().toISOString(),
-      durationSeconds,
-      route,
-      speakers,
-      segments,
-      estimatedUsd: roundCost(totalUsd),
-      estimatedCents: roundDisplay(totalUsd * 100),
-      perMinuteUsd: roundCost(perMinuteUsd),
-      perMinuteCents: roundDisplay(perMinuteUsd * 100),
-      adminFreeMode: Boolean(data?.adminFreeMode),
-      breakdown
-    };
-  }
-
-  function getAdminCostLogs() {
+    if (status) status.textContent = 'Chargement…';
     try {
-      const logs = JSON.parse(localStorage.getItem(ADMIN_COST_LOG_KEY) || '[]');
-      return Array.isArray(logs) ? logs : [];
-    } catch {
-      return [];
+      const response = await fetch(`${currentBackend()}/api/admin/cost-log?limit=50&t=${Date.now()}`, {
+        method: 'GET',
+        headers: { 'x-admin-secret': secret },
+        cache: 'no-store'
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Journal indisponible.');
+      costRows = Array.isArray(data.rows) ? data.rows : [];
+      costSummary = data.summary || {};
+      renderAdminCostLogs();
+      if (status) status.textContent = `${costRows.length} génération(s) suivie(s)`;
+    } catch (error) {
+      if (status) status.textContent = 'Erreur journal';
+      list.innerHTML = `<p class="hint">${escapeHtml(error.message || 'Impossible de charger les coûts.')}</p>`;
     }
-  }
-
-  function saveAdminCostLog(log) {
-    const logs = getAdminCostLogs();
-    logs.unshift(log);
-    localStorage.setItem(ADMIN_COST_LOG_KEY, JSON.stringify(logs.slice(0, MAX_COST_LOGS)));
-    renderAdminCostLogs();
   }
 
   function renderAdminCostLogs() {
     const list = document.getElementById('adminCostLogs');
     if (!list) return;
 
-    const logs = getAdminCostLogs();
-    const last = logs[0];
-    const totalUsd = logs.reduce((sum, item) => sum + Number(item.estimatedUsd || 0), 0);
-    const totalMinutes = logs.reduce((sum, item) => sum + Number(item.durationSeconds || 0) / 60, 0);
-    const averagePerMinute = totalMinutes > 0 ? totalUsd / totalMinutes : 0;
+    const last = document.getElementById('adminLastCost');
+    const average = document.getElementById('adminAverageCost');
+    const today = document.getElementById('adminTodayCost');
+    if (last) last.textContent = costSummary ? formatCents(costSummary.lastCostUsd) : '—';
+    if (average) average.textContent = costSummary ? `${formatCents(costSummary.averageCostPerMinuteUsd)}/min` : '—';
+    if (today) today.textContent = costSummary ? formatCents(costSummary.totalUsdToday) : '—';
 
-    const lastNode = document.getElementById('adminLastCost');
-    const averageNode = document.getElementById('adminAverageCost');
-    const totalNode = document.getElementById('adminTotalCost');
-    if (lastNode) lastNode.textContent = last ? `${Number(last.estimatedCents).toFixed(1)} ¢` : '—';
-    if (averageNode) averageNode.textContent = logs.length ? `${(averagePerMinute * 100).toFixed(1)} ¢` : '—';
-    if (totalNode) totalNode.textContent = logs.length ? `${(totalUsd * 100).toFixed(1)} ¢` : '—';
-
-    if (!logs.length) {
-      list.innerHTML = '<p class="hint">Aucune génération mesurée sur ce téléphone.</p>';
+    if (!costRows.length) {
+      list.innerHTML = '<p class="hint">Aucune génération mesurée depuis l’activation du journal.</p>';
       return;
     }
 
-    list.innerHTML = logs.slice(0, 12).map(item => {
-      const date = new Date(item.createdAt).toLocaleString('fr-FR', {
+    list.innerHTML = costRows.slice(0, 20).map(row => {
+      const relation = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+      const email = relation?.email || 'client';
+      const route = String(row.model_route || row.voice_style || 'auto');
+      const routeLabel = route.startsWith('realtime-') ? 'Realtime OpenAI' : 'Premium segmenté';
+      const duration = formatDuration(row.duration_seconds);
+      const date = new Date(row.created_at).toLocaleString('fr-FR', {
         day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
       });
-      const duration = formatDuration(item.durationSeconds);
-      const routeLabel = item.route.startsWith('realtime-')
-        ? 'Realtime OpenAI'
-        : 'Premium segmenté';
       return `
         <div class="admin-cost-row">
           <div class="admin-cost-row-top">
-            <strong>${escapeCostHtml(duration)} · ${escapeCostHtml(routeLabel)}</strong>
-            <strong class="cost">≈ ${Number(item.estimatedCents).toFixed(1)} ¢</strong>
+            <strong>${escapeHtml(duration)} · ${escapeHtml(routeLabel)}</strong>
+            <strong class="cost">≈ ${formatCents(row.api_cost_estimate_usd)}</strong>
           </div>
-          <small>${escapeCostHtml(date)} · ${Number(item.perMinuteCents).toFixed(1)} ¢/min · ${Number(item.speakers || 1)} voix · ${Number(item.segments || 1)} segments</small>
+          <small>${escapeHtml(email)} · ${escapeHtml(date)} · ${formatCents(row.api_cost_per_minute_usd)}/min</small>
         </div>`;
     }).join('');
   }
 
-  function installCostFetchLogger() {
-    if (window.__VIRALVOICE_COST_FETCH_INSTALLED) return;
-    window.__VIRALVOICE_COST_FETCH_INSTALLED = true;
-
+  function installCostRefreshHook() {
+    if (window.__VIRALVOICE_ADMIN_COST_HOOK) return;
+    window.__VIRALVOICE_ADMIN_COST_HOOK = true;
     const originalFetch = window.fetch.bind(window);
     window.fetch = async (...args) => {
       const response = await originalFetch(...args);
       try {
-        const requestUrl = typeof args[0] === 'string' ? args[0] : String(args[0]?.url || '');
-        if (response.ok && requestUrl.includes('/api/dub-video')) {
-          response.clone().json().then(data => {
-            if (!data?.ok) return;
-            if (!isAdminEmail() && localStorage.getItem(ADMIN_FREE_MODE_KEY) !== 'true') return;
-            saveAdminCostLog(estimateGenerationCost(data));
-          }).catch(() => {});
+        const url = typeof args[0] === 'string' ? args[0] : String(args[0]?.url || '');
+        if (response.ok && url.includes('/api/dub-video') && isAdminEmail()) {
+          window.setTimeout(loadAdminCostLogs, 300);
         }
       } catch {
-        // Le journal ne doit jamais bloquer une génération.
+        // Le suivi de coût ne doit jamais bloquer ViralVoice.
       }
       return response;
     };
+  }
+
+  function handleClientEmailInput() {
+    if (!clientEmail) return;
+    const email = cleanEmail(clientEmail.value);
+    localStorage.setItem(CLIENT_EMAIL_KEY, email);
+    if (email === ADMIN_EMAIL) openAdminPanel();
+  }
+
+  function formatCents(usd) {
+    return `${(Math.max(0, Number(usd || 0)) * 100).toFixed(1)} ¢`;
   }
 
   function formatDuration(seconds) {
@@ -441,18 +341,10 @@
     return `${minutes} min ${String(rest).padStart(2, '0')} s`;
   }
 
-  function escapeCostHtml(value) {
+  function escapeHtml(value) {
     return String(value || '').replace(/[&<>'"]/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
     }[char]));
-  }
-
-  function roundCost(value) {
-    return Math.round(Number(value || 0) * 1_000_000) / 1_000_000;
-  }
-
-  function roundDisplay(value) {
-    return Math.round(Number(value || 0) * 100) / 100;
   }
 
   function init() {
@@ -462,8 +354,7 @@
     restoreAdminSecretInput();
     restoreAdminFreeMode();
     addAdminCostPanel();
-    installCostFetchLogger();
-    renderAdminCostLogs();
+    installCostRefreshHook();
 
     if (clientEmail) {
       clientEmail.addEventListener('input', handleClientEmailInput);
