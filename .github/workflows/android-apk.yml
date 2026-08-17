@@ -15,6 +15,8 @@ on:
       - 'script.js'
       - 'speaker-sync-v36.js'
       - 'pro-v36.js'
+      - 'audio-presets.js'
+      - 'runtime-v402.js'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
   pull_request:
@@ -28,6 +30,8 @@ on:
       - 'script.js'
       - 'speaker-sync-v36.js'
       - 'pro-v36.js'
+      - 'audio-presets.js'
+      - 'runtime-v402.js'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
 
@@ -52,6 +56,7 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npm run check
+          node --check runtime-v402.js
           cd backend
           npm install --no-audit --no-fund
           npm run check
@@ -78,10 +83,10 @@ jobs:
         shell: bash
         run: |
           test -f android/app/build/outputs/apk/debug/app-debug.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk ViralVoice-4.0.1.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk ViralVoice-4.0.2.apk
           {
             echo "status=success"
-            echo "version=4.0.1"
+            echo "version=4.0.2"
             echo "commit=${GITHUB_SHA}"
             echo "branch=${GITHUB_REF_NAME}"
             echo "workflow_run=${GITHUB_RUN_ID}"
@@ -91,8 +96,8 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ViralVoice-4.0.1-APK
-          path: ViralVoice-4.0.1.apk
+          name: ViralVoice-4.0.2-APK
+          path: ViralVoice-4.0.2.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -101,7 +106,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p /tmp/viralvoice-apk
-          cp ViralVoice-4.0.1.apk build-status.txt /tmp/viralvoice-apk/
+          cp ViralVoice-4.0.2.apk build-status.txt /tmp/viralvoice-apk/
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -110,7 +115,7 @@ jobs:
           git clean -fdx
           cp /tmp/viralvoice-apk/* .
           git add .
-          git commit -m "Publish ViralVoice 4.0.1 APK ${GITHUB_SHA}"
+          git commit -m "Publish ViralVoice 4.0.2 APK ${GITHUB_SHA}"
           git push --force origin HEAD:apk-builds
 
       - name: Create or update GitHub Release
@@ -119,15 +124,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v4.0.1"
-          TITLE="ViralVoice v4.0.1"
-          NOTES="ViralVoice 4.0.1 : correctif majeur du niveau audio. Le mixage multi-segments ne divise plus le volume selon le nombre de répliques, normalisation renforcée, limiteur de sécurité et test automatique anti-régression. Routage OpenAI automatique conservé."
+          TAG="v4.0.2"
+          TITLE="ViralVoice v4.0.2"
+          NOTES="ViralVoice 4.0.2 : correctif du blocage sur Connexion/Réveil Render. Backend officiel forcé, timeout et trois tentatives réseau, suppression du contrôle de solde client redondant avant génération (le backend reste seul responsable du débit des minutes), correction des packs 5/30/60/180 minutes. Correctif audio 4.0.1 conservé."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" ViralVoice-4.0.1.apk --clobber
+            gh release upload "$TAG" ViralVoice-4.0.2.apk --clobber
             gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --latest
           else
-            gh release create "$TAG" ViralVoice-4.0.1.apk \
+            gh release create "$TAG" ViralVoice-4.0.2.apk \
               --target main \
               --title "$TITLE" \
               --notes "$NOTES" \
