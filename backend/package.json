@@ -1,7 +1,7 @@
 {
   "name": "viralvoice-backend",
-  "version": "4.0.0",
-  "description": "Point de déploiement Render pour ViralVoice 4.0.0 Auto OpenAI.",
+  "version": "4.0.1",
+  "description": "Point de déploiement Render pour ViralVoice 4.0.1 Auto OpenAI.",
   "main": "../server-v3.js",
   "type": "commonjs",
   "scripts": {
