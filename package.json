@@ -1,12 +1,12 @@
 {
   "name": "viralvoice",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "ViralVoice - doublage IA automatique OpenAI avec routage intelligent mono/multi-intervenants.",
   "main": "server-v3.js",
   "type": "commonjs",
   "scripts": {
     "start": "node -r ./runtime-limits.js server-v3.js",
-    "check": "node --check server-v3.js && node --check runtime-limits.js && node --check speaker-sync-v35.js && node --check speaker-sync-v36.js && node --check pro-v35.js && node --check pro-v36.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/media-extra.js && node --check lib/speech-sync.js && node --check lib/realtime-translate.js && node --check lib/auto-dubbing.js && node --check scripts/media-fit-smoke.js && node scripts/media-fit-smoke.js"
+    "check": "node --check server-v3.js && node --check runtime-limits.js && node --check admin-access.js && node --check speaker-sync-v35.js && node --check speaker-sync-v36.js && node --check pro-v35.js && node --check pro-v36.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/media-extra.js && node --check lib/speech-sync.js && node --check lib/realtime-translate.js && node --check lib/auto-dubbing.js && node --check lib/cost-meter.js && node --check scripts/media-fit-smoke.js && node scripts/media-fit-smoke.js"
   },
   "engines": {
     "node": ">=20"
