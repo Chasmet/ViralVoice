@@ -1,6 +1,6 @@
 {
   "name": "viralvoice",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "ViralVoice - doublage IA automatique OpenAI avec routage intelligent mono/multi-intervenants.",
   "main": "server-v3.js",
   "type": "commonjs",
