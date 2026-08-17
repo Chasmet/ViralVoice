@@ -11,6 +11,7 @@ const db = require('./lib/database');
 const media = require('./lib/media');
 const speech = require('./lib/speech-sync');
 const autoDubbing = require('./lib/auto-dubbing');
+const costMeter = require('./lib/cost-meter');
 const {
   normalizeEmail, cleanText, cleanVoice, cleanSpeakerRole,
   clamp, safeDelete, logMemory
@@ -35,14 +36,14 @@ app.use(express.static(config.PUBLIC_DIR));
 app.get('/', (req, res) => res.json({
   ok: true,
   app: 'ViralVoice API',
-  version: '4.0.0-auto-openai'
+  version: '4.0.2-cost-log'
 }));
 
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     app: 'ViralVoice API',
-    version: '4.0.0-auto-openai',
+    version: '4.0.2-cost-log',
     openaiKey: Boolean(process.env.OPENAI_API_KEY),
     supabase: db.isConfigured(),
     adminSecret: Boolean(config.ADMIN_SECRET),
@@ -52,6 +53,7 @@ app.get('/api/health', (req, res) => {
     maxSyncSegments: config.MAX_SYNC_SEGMENTS,
     busy: jobRunning,
     autoRouting: true,
+    adminCostLog: true,
     transcriptionModel: config.TRANSCRIBE_MODEL,
     diarizationModel: config.DIARIZE_MODEL,
     realtimeTranslateModel: config.REALTIME_TRANSLATE_MODEL,
@@ -113,6 +115,22 @@ app.post('/api/admin/add-tokens', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Erreur ajout minutes.' });
+  }
+});
+
+app.get('/api/admin/cost-log', async (req, res) => {
+  try {
+    requireAdmin(req);
+    const result = await db.getAdminCostLog(Number(req.query.limit || 50));
+    res.json({
+      ok: true,
+      currency: 'USD',
+      estimateOnly: true,
+      message: 'Coûts API estimés pour le pilotage. La facture OpenAI finale reste la référence.',
+      ...result
+    });
+  } catch (error) {
+    res.status(403).json({ error: error.message || 'Accès admin refusé.' });
   }
 });
 
@@ -339,17 +357,33 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
       payload.dubbedVideoUrl = `/outputs/${path.basename(finalVideoPath)}`;
     }
 
+    const apiCost = costMeter.estimateRouteCost({
+      durationSeconds: duration,
+      route: route.id,
+      speakers: speakers.length,
+      segments: prepared.length,
+      realtimeTranscription: realtimeRoute
+    });
+
     await db.recordGeneration({
       clientId: chargedClient.id,
       prompt: `Doublage automatique ${route.id} vers ${options.targetLanguage}`,
       voiceStyle: route.id,
       resultUrl: payload.dubbedVideoUrl || payload.dubbedAudioUrl,
       status: adminFreeMode ? 'admin_free' : 'completed',
-      tokensUsed: adminFreeMode ? 0 : minutesNeeded
+      tokensUsed: adminFreeMode ? 0 : minutesNeeded,
+      durationSeconds: Number(duration.toFixed(3)),
+      apiCostEstimateUsd: apiCost.estimatedUsd,
+      apiCostPerMinuteUsd: apiCost.costPerMinuteUsd,
+      apiCostBreakdown: apiCost,
+      modelRoute: route.id
     });
 
     payload.wallet = await db.getWalletByClientId(chargedClient.id);
-    console.log(`[${jobId}] DONE route=${route.id}`);
+    console.log(
+      `[${jobId}] DONE route=${route.id} estimatedApiCost=` +
+      `$${apiCost.estimatedUsd.toFixed(4)} (${apiCost.costPerMinuteCents.toFixed(1)}c/min)`
+    );
     res.json(payload);
   } catch (error) {
     console.error(`[${jobId}] ERROR`, error);
@@ -451,7 +485,7 @@ function requireAdmin(req) {
   if (!config.ADMIN_SECRET) {
     throw new Error('ADMIN_SECRET manquant dans Render.');
   }
-  const secret = String(req.headers['x-admin-secret'] || req.body.adminSecret || '');
+  const secret = String(req.headers['x-admin-secret'] || req.body?.adminSecret || '');
   if (secret !== config.ADMIN_SECRET) {
     throw new Error('Accès admin refusé.');
   }
@@ -459,7 +493,7 @@ function requireAdmin(req) {
 
 function isAdminFreeRequest(req) {
   if (!config.ADMIN_SECRET) return false;
-  return String(req.headers['x-admin-secret'] || req.body.adminSecret || '') ===
+  return String(req.headers['x-admin-secret'] || req.body?.adminSecret || '') ===
     config.ADMIN_SECRET;
 }
 
@@ -500,5 +534,5 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(config.PORT, () => {
-  console.log(`ViralVoice 4.0 démarré sur ${config.PORT}`);
+  console.log(`ViralVoice 4.0.2 démarré sur ${config.PORT}`);
 });
