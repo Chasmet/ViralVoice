@@ -10,6 +10,7 @@ const config = require('./lib/config');
 const db = require('./lib/database');
 const media = require('./lib/media');
 const speech = require('./lib/speech-sync');
+const autoDubbing = require('./lib/auto-dubbing');
 const {
   normalizeEmail, cleanText, cleanVoice, cleanSpeakerRole,
   clamp, safeDelete, logMemory
@@ -34,14 +35,14 @@ app.use(express.static(config.PUBLIC_DIR));
 app.get('/', (req, res) => res.json({
   ok: true,
   app: 'ViralVoice API',
-  version: '3.6.0-premium-dubbing'
+  version: '4.0.0-auto-openai'
 }));
 
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     app: 'ViralVoice API',
-    version: '3.6.0-premium-dubbing',
+    version: '4.0.0-auto-openai',
     openaiKey: Boolean(process.env.OPENAI_API_KEY),
     supabase: db.isConfigured(),
     adminSecret: Boolean(config.ADMIN_SECRET),
@@ -50,15 +51,18 @@ app.get('/api/health', (req, res) => {
     maxDurationSeconds: config.MAX_DURATION_SECONDS,
     maxSyncSegments: config.MAX_SYNC_SEGMENTS,
     busy: jobRunning,
+    autoRouting: true,
     transcriptionModel: config.TRANSCRIBE_MODEL,
     diarizationModel: config.DIARIZE_MODEL,
+    realtimeTranslateModel: config.REALTIME_TRANSLATE_MODEL,
+    realtimeTranscribeModel: config.REALTIME_TRANSCRIBE_MODEL,
     translationModel: config.TEXT_MODEL,
     translationFallbackModel: config.TEXT_FALLBACK_MODEL,
     translationReasoningEffort: config.TEXT_REASONING_EFFORT,
     audioDubModel: config.AUDIO_DUB_MODEL,
     ttsFallbackModel: config.TTS_FALLBACK_MODEL,
     voiceProfileModel: config.VOICE_PROFILE_MODEL,
-    syncMode: 'duration-adapted-speaker-segments'
+    syncMode: 'automatic-openai-routing'
   });
 });
 
@@ -158,7 +162,7 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
       maleVoice: cleanVoice(req.body.maleVoice || 'cedar'),
       femaleVoice: cleanVoice(req.body.femaleVoice || 'coral'),
       firstSpeakerRole: cleanSpeakerRole(req.body.firstSpeakerRole || 'auto'),
-      multiVoiceRequested: String(req.body.multiVoice || 'false') === 'true',
+      multiVoiceRequested: true,
       voiceVolume: clamp(Number(req.body.voiceVolume || 1), 0.6, 1.3),
       originalVolume: clamp(Number(req.body.originalVolume || 0.18), 0, 0.6)
     };
@@ -209,78 +213,74 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
     }
 
     const speakers = [...new Set(segments.map(segment => segment.speaker))];
-    const speakerProfiles = await detectSpeakerProfiles({
-      sourceAudioPath,
-      segments,
+    let route = autoDubbing.chooseRoute({
       speakers,
-      options,
-      createdFiles,
-      jobId
+      targetLanguage: options.targetLanguage
     });
+    let routeFallbackReason = null;
+    let dubbing = null;
 
-    const translated = await speech.translateTimedSegments(
-      segments,
-      options.targetLanguage,
-      jobId
+    console.log(
+      `[${jobId}] AUTO ROUTE ${route.id} speakers=${speakers.length} ` +
+      `segments=${segments.length} language=${options.targetLanguage}`
     );
 
-    const voiceMap = speech.buildSpeakerVoiceMap({
-      speakers,
-      speakerProfiles,
-      ...options
-    });
-
-    const prepared = [];
-    const voiceEngines = new Set();
-    let voiceFallbackSegments = 0;
-
-    for (let index = 0; index < translated.length; index += 1) {
-      const segment = translated[index];
-      const slotDuration = Math.max(0.25, segment.end - segment.start);
-      const rawPath = path.join(config.WORK_DIR, `${jobId}-${index}-raw.wav`);
-      const fitPath = path.join(config.WORK_DIR, `${jobId}-${index}-fit.wav`);
-      createdFiles.push(rawPath, fitPath);
-
-      const voice = voiceMap[segment.speaker] || options.selectedVoice;
-      const role = speech.getSpeakerRole(
-        segment.speaker,
-        speakers,
-        options.firstSpeakerRole,
-        speakerProfiles
-      );
-
-      const voiceResult = await speech.generateVoiceSegment({
-        text: segment.translatedText,
-        voice,
-        outputPath: rawPath,
-        slotDuration,
-        role,
-        delivery: segment.delivery,
-        pace: segment.pace
-      });
-      voiceEngines.add(voiceResult.engine);
-      if (voiceResult.fallback) voiceFallbackSegments += 1;
-
-      await media.fitVoiceToDuration(rawPath, fitPath, slotDuration);
-      prepared.push({
-        ...segment,
-        voice,
-        voiceEngine: voiceResult.engine,
-        voiceProfile: speakerProfiles[segment.speaker]?.profile || 'neutral',
-        audioPath: fitPath
-      });
-
-      console.log(
-        `[${jobId}] SEGMENT ${index + 1}/${translated.length} ` +
-        `${segment.speaker} ${segment.start.toFixed(2)}-${segment.end.toFixed(2)} ` +
-        `${role}/${voice}/${voiceResult.engine} ` +
-        `words=${speech.countWords(segment.translatedText)}/${segment.wordBudget}`
-      );
+    if (route.id.startsWith('realtime-')) {
+      try {
+        dubbing = await autoDubbing.runRealtimeAdaptive({
+          sourceAudioPath,
+          segments,
+          targetLanguage: options.targetLanguage,
+          duration,
+          timelinePath,
+          silentPath,
+          finalAudioPath,
+          voiceVolume: options.voiceVolume,
+          createdFiles,
+          jobId
+        });
+      } catch (realtimeError) {
+        routeFallbackReason = realtimeError.message || 'Moteur temps réel indisponible.';
+        console.warn(`[${jobId}] REALTIME AUTO FALLBACK`, routeFallbackReason);
+        route = {
+          id: speakers.length > 1
+            ? 'segmented-multispeaker-auto-fallback'
+            : 'segmented-auto-fallback',
+          label: speakers.length > 1
+            ? 'Doublage multi-intervenants synchronisé'
+            : 'Doublage synchronisé de secours',
+          reason: 'Le moteur direct a demandé un secours automatique.'
+        };
+      }
     }
 
-    await media.createSilentAudio(silentPath, duration);
-    await media.renderSpeakerTimeline(silentPath, prepared, timelinePath, duration);
-    await media.normalizeVoice(timelinePath, finalAudioPath, options.voiceVolume);
+    if (!dubbing) {
+      const speakerProfiles = await detectSpeakerProfiles({
+        sourceAudioPath,
+        segments,
+        speakers,
+        options,
+        createdFiles,
+        jobId
+      });
+
+      dubbing = await autoDubbing.runSegmentedPremium({
+        segments,
+        speakers,
+        speakerProfiles,
+        options,
+        duration,
+        timelinePath,
+        silentPath,
+        finalAudioPath,
+        createdFiles,
+        jobId
+      });
+    }
+
+    const translated = dubbing.translated;
+    const prepared = dubbing.prepared;
+    const realtimeRoute = route.id.startsWith('realtime-');
 
     const payload = {
       ok: true,
@@ -288,30 +288,38 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
       adminFreeMode,
       durationSeconds: Number(duration.toFixed(3)),
       minutesUsed: adminFreeMode ? 0 : minutesNeeded,
+      autoRouting: true,
+      autoEngine: route.id,
+      autoEngineLabel: route.label,
+      autoEngineReason: route.reason,
+      autoFallbackReason: routeFallbackReason,
       transcript: segments.map(item => `${item.speaker}: ${item.text}`).join('\n'),
       translation: translated
         .map(item => `${item.speaker}: ${item.translatedText}`)
         .join('\n'),
-      multiVoiceRequested: options.multiVoiceRequested,
-      multiVoiceUsed: options.multiVoiceRequested && speakers.length > 1,
+      multiVoiceRequested: true,
+      multiVoiceUsed: speakers.length > 1,
       speakersDetected: speakers.length,
-      speakerProfiles,
-      speakerVoices: voiceMap,
-      voiceDetectionMode:
-        options.firstSpeakerRole === 'auto'
+      speakerProfiles: dubbing.speakerProfiles,
+      speakerVoices: dubbing.voiceMap,
+      voiceDetectionMode: realtimeRoute
+        ? 'dynamic-source-adaptation'
+        : options.firstSpeakerRole === 'auto'
           ? 'automatic-audio-profile'
           : 'manual-first-speaker',
       synchronizedSegments: prepared.length,
-      durationAdaptedSegments: translated.filter(
-        item => speech.countWords(item.translatedText) <= item.wordBudget + 2
-      ).length,
-      syncMode: 'duration-adapted-speaker-segments',
+      durationAdaptedSegments: realtimeRoute
+        ? prepared.length
+        : translated.filter(
+          item => speech.countWords(item.translatedText) <= item.wordBudget + 2
+        ).length,
+      syncMode: dubbing.syncMode,
       transcriptionMode: transcription.mode,
       transcriptionModel: config.DIARIZE_MODEL,
-      translationModel: config.TEXT_MODEL,
-      audioDubModel: config.AUDIO_DUB_MODEL,
-      voiceEngines: [...voiceEngines],
-      voiceFallbackSegments,
+      translationModel: dubbing.translationModel,
+      audioDubModel: dubbing.audioDubModel,
+      voiceEngines: dubbing.voiceEngines,
+      voiceFallbackSegments: dubbing.voiceFallbackSegments,
       warning: transcription.warning || null,
       lipSyncRequested: false,
       lipSyncUsed: false,
@@ -333,15 +341,15 @@ app.post('/api/dub-video', upload.single('media'), async (req, res) => {
 
     await db.recordGeneration({
       clientId: chargedClient.id,
-      prompt: `Doublage premium adapté vers ${options.targetLanguage}`,
-      voiceStyle: payload.multiVoiceUsed ? 'premium-auto-profile' : options.selectedVoice,
+      prompt: `Doublage automatique ${route.id} vers ${options.targetLanguage}`,
+      voiceStyle: route.id,
       resultUrl: payload.dubbedVideoUrl || payload.dubbedAudioUrl,
       status: adminFreeMode ? 'admin_free' : 'completed',
       tokensUsed: adminFreeMode ? 0 : minutesNeeded
     });
 
     payload.wallet = await db.getWalletByClientId(chargedClient.id);
-    console.log(`[${jobId}] DONE`);
+    console.log(`[${jobId}] DONE route=${route.id}`);
     res.json(payload);
   } catch (error) {
     console.error(`[${jobId}] ERROR`, error);
@@ -419,7 +427,7 @@ async function detectSpeakerProfiles({
         jobId
       );
     } catch (error) {
-      console.warn(`[${jobId}] PROFILE SAMPLE FALLBACK ${speaker}`, error.message || error);
+      console.warn(`[${jobId}] VOICE PROFILE FALLBACK ${speaker}`, error.message || error);
       profiles[speaker] = {
         profile: 'neutral',
         confidence: 0,
@@ -492,5 +500,5 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(config.PORT, () => {
-  console.log(`ViralVoice 3.6 démarré sur ${config.PORT}`);
+  console.log(`ViralVoice 4.0 démarré sur ${config.PORT}`);
 });
