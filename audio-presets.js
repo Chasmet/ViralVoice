@@ -46,3 +46,16 @@ function applyAudioPreset(presetName) {
     card.classList.toggle('active', Boolean(input && input.value === presetName));
   });
 }
+
+// V4.0.2 : charge un correctif réseau avec une URL unique afin de ne jamais
+// réutiliser le JavaScript 3.6 mis en cache par la WebView/GitHub Pages.
+(() => {
+  const previous = document.getElementById('viralvoiceRuntime402');
+  if (previous) previous.remove();
+
+  const runtime = document.createElement('script');
+  runtime.id = 'viralvoiceRuntime402';
+  runtime.src = `runtime-v402.js?v=402&t=${Date.now()}`;
+  runtime.async = false;
+  document.head.appendChild(runtime);
+})();
