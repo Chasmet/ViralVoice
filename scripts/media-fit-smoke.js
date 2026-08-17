@@ -38,6 +38,18 @@ async function assertDuration(filePath, expected, tolerance, label) {
   return info;
 }
 
+function assertAudible(stats, minPeakDb, label) {
+  if (!stats || !Number.isFinite(stats.maxVolume)) {
+    throw new Error(`${label} : niveau audio impossible à mesurer.`);
+  }
+
+  if (stats.maxVolume < minPeakDb) {
+    throw new Error(
+      `${label} trop faible : pic ${stats.maxVolume} dB, minimum ${minPeakDb} dB.`
+    );
+  }
+}
+
 async function main() {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'viralvoice-media-'));
   const sourceA = path.join(workDir, 'source-a.wav');
@@ -46,6 +58,7 @@ async function main() {
   const fittedB = path.join(workDir, 'fitted-b.wav');
   const silentBed = path.join(workDir, 'silent.wav');
   const timeline = path.join(workDir, 'timeline.mp3');
+  const normalized = path.join(workDir, 'normalized.mp3');
   const totalDuration = 4.5;
 
   try {
@@ -77,9 +90,24 @@ async function main() {
       'Timeline multi-voix'
     );
 
+    const timelineLevel = await media.detectVolumeStats(timeline);
+    assertAudible(timelineLevel, -22, 'Timeline multi-voix');
+
+    await media.normalizeVoice(timeline, normalized, 1.05);
+    await assertDuration(
+      normalized,
+      totalDuration,
+      0.16,
+      'Voix normalisée'
+    );
+
+    const normalizedLevel = await media.detectVolumeStats(normalized);
+    assertAudible(normalizedLevel, -10, 'Voix normalisée');
+
     console.log(
       `FFmpeg multi-voix OK: ${timelineInfo.duration.toFixed(3)}s, ` +
-      `${fs.statSync(timeline).size} octets.`
+      `timeline=${timelineLevel.maxVolume.toFixed(1)}dB, ` +
+      `normalisé=${normalizedLevel.maxVolume.toFixed(1)}dB.`
     );
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
