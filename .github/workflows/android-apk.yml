@@ -7,20 +7,24 @@ on:
       - main
     paths:
       - 'android/**'
+      - 'backend/**'
       - 'lib/**'
       - 'server-v3.js'
       - 'package.json'
       - 'script.js'
+      - 'speaker-sync-v36.js'
       - 'pro-v36.js'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
   pull_request:
     paths:
       - 'android/**'
+      - 'backend/**'
       - 'lib/**'
       - 'server-v3.js'
       - 'package.json'
       - 'script.js'
+      - 'speaker-sync-v36.js'
       - 'pro-v36.js'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
@@ -44,6 +48,9 @@ jobs:
       - name: Validate ViralVoice backend
         shell: bash
         run: |
+          npm install --no-audit --no-fund
+          npm run check
+          cd backend
           npm install --no-audit --no-fund
           npm run check
 
@@ -112,7 +119,7 @@ jobs:
         run: |
           TAG="v4.0.0"
           TITLE="ViralVoice v4.0.0"
-          NOTES="ViralVoice 4.0.0 : routage OpenAI automatique, détection multi-intervenants, moteur Realtime Translate quand compatible, secours segmenté OpenAI, nouvelle interface et nouvelle identité visuelle."
+          NOTES="ViralVoice 4.0.0 : routage OpenAI automatique, détection multi-intervenants, Realtime Translate quand compatible, secours segmenté OpenAI, nouvelle interface et nouvelle identité visuelle."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" ViralVoice-4.0.0.apk --clobber
