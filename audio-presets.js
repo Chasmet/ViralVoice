@@ -59,3 +59,16 @@ function applyAudioPreset(presetName) {
   runtime.async = false;
   document.head.appendChild(runtime);
 })();
+
+// V4.0.3 : compteur privé du budget API OpenAI. Le fichier est chargé avec
+// un cache-buster afin que l'APK récupère toujours la dernière version.
+(() => {
+  const previous = document.getElementById('viralvoiceAdminBudget403');
+  if (previous) previous.remove();
+
+  const counter = document.createElement('script');
+  counter.id = 'viralvoiceAdminBudget403';
+  counter.src = `admin-budget-counter.js?v=403&t=${Date.now()}`;
+  counter.async = false;
+  document.head.appendChild(counter);
+})();
