@@ -16,8 +16,8 @@ android {
         applicationId 'com.chasmet.viralvoice'
         minSdk 21
         targetSdk 34
-        versionCode 15
-        versionName '4.0.2'
+        versionCode 16
+        versionName '4.0.3'
     }
 
     signingConfigs {
@@ -52,9 +52,9 @@ android {
     }
 }
 
-// V4.0.2 : la source historique MainActivity contient encore les marqueurs 3.6.5.
+// V4.0.3 : la source historique MainActivity contient encore les marqueurs 3.6.5.
 // Le build remplace ces marqueurs avant compilation afin de casser le cache WebView
-// et de charger explicitement le runtime 4.0.2 sans modifier les fonctions de sauvegarde.
+// et de charger explicitement la version 4.0.3 sans modifier les fonctions de sauvegarde.
 tasks.configureEach { task ->
     if (task.name == 'preDebugBuild' || task.name == 'preReleaseBuild') {
         task.doFirst {
@@ -66,8 +66,8 @@ tasks.configureEach { task ->
             def source = mainActivity.getText('UTF-8')
             source = source
                     .replace('https://chasmet.github.io/ViralVoice/?app=365',
-                            'https://chasmet.github.io/ViralVoice/?app=402')
-                    .replace('ViralVoiceAndroid/3.6.5', 'ViralVoiceAndroid/4.0.2')
+                            'https://chasmet.github.io/ViralVoice/?app=403')
+                    .replace('ViralVoiceAndroid/3.6.5', 'ViralVoiceAndroid/4.0.3')
                     .replace('settings.setCacheMode(WebSettings.LOAD_DEFAULT);',
                             'settings.setCacheMode(WebSettings.LOAD_NO_CACHE);')
 
