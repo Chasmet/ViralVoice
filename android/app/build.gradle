@@ -16,8 +16,8 @@ android {
         applicationId 'com.chasmet.viralvoice'
         minSdk 21
         targetSdk 34
-        versionCode 24
-        versionName '4.0.11'
+        versionCode 25
+        versionName '4.0.12'
     }
 
     buildFeatures {
@@ -56,8 +56,13 @@ android {
     }
 }
 
-// V4.0.11 : même signature stable et données conservées. Le runtime natif
-// restaure le compteur admin et l'ajout rapide de minutes, indépendamment du cache web.
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+}
+
+// V4.0.12 : même signature stable et données conservées. Les mises à jour
+// utilisent un téléchargement HTTP direct avec progression immédiate et
+// DownloadManager uniquement comme secours.
 tasks.configureEach { task ->
     if (task.name == 'preDebugBuild' || task.name == 'preReleaseBuild') {
         task.doFirst {
@@ -69,8 +74,8 @@ tasks.configureEach { task ->
             def source = mainActivity.getText('UTF-8')
             source = source
                     .replace('https://chasmet.github.io/ViralVoice/?app=365',
-                            'https://chasmet.github.io/ViralVoice/?app=411')
-                    .replace('ViralVoiceAndroid/3.6.5', 'ViralVoiceAndroid/4.0.11')
+                            'https://chasmet.github.io/ViralVoice/?app=412')
+                    .replace('ViralVoiceAndroid/3.6.5', 'ViralVoiceAndroid/4.0.12')
                     .replace('webView.clearCache(true);\n            webView.loadUrl(APP_URL + "&t=" + System.currentTimeMillis());',
                             'webView.loadUrl(APP_URL);')
 
