@@ -46,6 +46,16 @@
     document.getElementById('adminQuick411Style')?.remove();
   }
 
+  function ensureFileSelectorFix() {
+    if (window.__VIRALVOICE_FILE_SELECTOR_FIX_V415) return;
+    if (document.getElementById('viralvoiceFileSelectorFix')) return;
+    const script = document.createElement('script');
+    script.id = 'viralvoiceFileSelectorFix';
+    script.src = `file-selector-fix.js?v=415&t=${Date.now()}`;
+    script.async = false;
+    document.head.appendChild(script);
+  }
+
   function ensureBudgetScript() {
     if (document.getElementById('apiBudgetCounter')) return;
     if (document.getElementById('viralvoiceBudgetCurrent')) return;
@@ -188,6 +198,7 @@
   function syncAdminUi() {
     removeLegacyDuplicate();
     syncVersion();
+    ensureFileSelectorFix();
     if (!isAdminReady()) return;
     restoreAdminPanel();
     ensureBudgetScript();
