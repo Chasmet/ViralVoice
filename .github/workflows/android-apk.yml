@@ -12,16 +12,8 @@ on:
       - 'scripts/**'
       - 'server-v3.js'
       - 'package.json'
-      - 'script.js'
-      - 'speaker-sync-v36.js'
-      - 'pro-v36.js'
-      - 'audio-presets.js'
-      - 'runtime-v402.js'
-      - 'admin-budget-counter.js'
-      - 'admin-repair-v411.js'
-      - 'migration-backup.js'
-      - 'web-updater.js'
-      - 'recovery-client.js'
+      - 'app-v410.js'
+      - 'stable-v410.css'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
   pull_request:
@@ -32,16 +24,8 @@ on:
       - 'scripts/**'
       - 'server-v3.js'
       - 'package.json'
-      - 'script.js'
-      - 'speaker-sync-v36.js'
-      - 'pro-v36.js'
-      - 'audio-presets.js'
-      - 'runtime-v402.js'
-      - 'admin-budget-counter.js'
-      - 'admin-repair-v411.js'
-      - 'migration-backup.js'
-      - 'web-updater.js'
-      - 'recovery-client.js'
+      - 'app-v410.js'
+      - 'stable-v410.css'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
 
@@ -74,17 +58,14 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Validate ViralVoice backend, audio, recovery and admin repair
+      - name: Validate backend and stable 4.1 UI
         shell: bash
         run: |
+          set -euo pipefail
           npm install --no-audit --no-fund
           npm run check
-          node --check runtime-v402.js
-          node --check admin-budget-counter.js
-          node --check admin-repair-v411.js
-          node --check migration-backup.js
-          node --check web-updater.js
-          node --check recovery-client.js
+          node --check app-v410.js
+          node scripts/ui-stability-smoke.js
           cd backend
           npm install --no-audit --no-fund
           npm run check
@@ -203,8 +184,8 @@ jobs:
           {
             "versionCode": ${VERSION_CODE},
             "versionName": "${VERSION_NAME}",
-            "title": "ViralVoice ${VERSION_NAME} est disponible",
-            "notes": "Nouvelle version compilée, signée et prête à installer. Tes données restent conservées.",
+            "title": "ViralVoice ${VERSION_NAME} Stable est disponible",
+            "notes": "Interface reconstruite pour supprimer les scripts concurrents, restaurer une navigation fluide et fiabiliser la sélection vidéo. Tes données restent conservées.",
             "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/${APK_NAME}",
             "required": false
           }
@@ -228,8 +209,8 @@ jobs:
         run: |
           set -euo pipefail
           TAG="v${VERSION_NAME}"
-          TITLE="ViralVoice v${VERSION_NAME}"
-          NOTES="ViralVoice ${VERSION_NAME} : APK stable signé. La mise à jour n'est annoncée dans l'application qu'une fois le fichier réellement publié. Tes données restent conservées."
+          TITLE="ViralVoice v${VERSION_NAME} Stable"
+          NOTES="ViralVoice ${VERSION_NAME} Stable : reconstruction de l'interface WebView avec une seule couche JavaScript/CSS, navigation libre, sélecteur vidéo fiable et récupération de résultat intégrée. APK signé avec la signature de mise à jour stable."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK_NAME" --clobber
@@ -253,8 +234,8 @@ jobs:
           {
             "versionCode": ${VERSION_CODE},
             "versionName": "${VERSION_NAME}",
-            "title": "ViralVoice ${VERSION_NAME} est disponible",
-            "notes": "Nouvelle version compilée, signée et prête à installer. Tes données restent conservées.",
+            "title": "ViralVoice ${VERSION_NAME} Stable est disponible",
+            "notes": "Interface reconstruite pour supprimer les scripts concurrents, restaurer une navigation fluide et fiabiliser la sélection vidéo. Tes données restent conservées.",
             "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/${APK_NAME}",
             "required": false
           }
