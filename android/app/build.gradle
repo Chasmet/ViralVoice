@@ -20,6 +20,10 @@ android {
         versionName '4.0.4'
     }
 
+    buildFeatures {
+        buildConfig true
+    }
+
     signingConfigs {
         if (hasPlaySigning) {
             playRelease {
