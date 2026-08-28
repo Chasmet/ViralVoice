@@ -1,13 +1,14 @@
 (() => {
   'use strict';
 
-  if (window.__VIRALVOICE_RESULT_RECOVERY_V409) return;
-  window.__VIRALVOICE_RESULT_RECOVERY_V409 = true;
+  if (window.__VIRALVOICE_RESULT_RECOVERY_V413) return;
+  window.__VIRALVOICE_RESULT_RECOVERY_V413 = true;
 
   const previousFetch = window.fetch.bind(window);
-  const RECOVERY_DELAY_MS = 60000;
-  const RECOVERY_MAX_MS = 120000;
-  const POLL_MS = 2500;
+  const ACTIVE_KEY = 'viralvoice-active-result-recovery';
+  const POLL_START_DELAY_MS = 5000;
+  const POLL_MS = 2000;
+  const RECOVERY_MAX_MS = 20 * 60 * 1000;
 
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -23,42 +24,209 @@
     }
   }
 
+  function saveActive(baseUrl, token) {
+    try {
+      localStorage.setItem(ACTIVE_KEY, JSON.stringify({
+        baseUrl,
+        token,
+        startedAt: Date.now()
+      }));
+    } catch {
+      // Le doublage continue même si le stockage local est indisponible.
+    }
+  }
+
+  function readActive() {
+    try {
+      const value = JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null');
+      if (!value?.token || !value?.baseUrl || !value?.startedAt) return null;
+      if (Date.now() - Number(value.startedAt) > RECOVERY_MAX_MS) {
+        localStorage.removeItem(ACTIVE_KEY);
+        return null;
+      }
+      return value;
+    } catch {
+      return null;
+    }
+  }
+
+  function clearActive(token = '') {
+    try {
+      const current = readActive();
+      if (!token || !current || current.token === token) {
+        localStorage.removeItem(ACTIVE_KEY);
+      }
+    } catch {
+      // Rien à faire.
+    }
+  }
+
   function setRecoveryStatus(text) {
+    const card = document.getElementById('statusCard');
     const status = document.getElementById('statusText');
+    if (card) card.classList.remove('hidden');
     if (status) status.textContent = text;
   }
 
-  async function recover(baseUrl, token) {
-    const startedAt = Date.now();
-    setRecoveryStatus('Le serveur a fini ou va finir. Récupération automatique du résultat…');
+  function absoluteUrl(baseUrl, value) {
+    if (!value) return '';
+    try {
+      return new URL(value, `${String(baseUrl || '').replace(/\/$/, '')}/`).href;
+    } catch {
+      return value;
+    }
+  }
 
-    while (Date.now() - startedAt < RECOVERY_MAX_MS) {
+  function applyRecoveredResult(data, baseUrl) {
+    if (!data?.ok) return false;
+
+    const outputText = document.getElementById('outputText');
+    const speakerInfo = document.getElementById('speakerInfo');
+    const finalVideo = document.getElementById('finalVideo');
+    const finalAudio = document.getElementById('finalAudio');
+    const downloadVideoBtn = document.getElementById('downloadVideoBtn');
+    const downloadAudioBtn = document.getElementById('downloadAudioBtn');
+    const resultCard = document.getElementById('resultCard');
+    const statusCard = document.getElementById('statusCard');
+    const statusText = document.getElementById('statusText');
+    const userStatus = document.getElementById('userStatus');
+    const walletBadge = document.getElementById('walletBadge');
+    const dubBtn = document.getElementById('dubBtn');
+
+    if (outputText) outputText.value = data.translation || '';
+
+    if (speakerInfo) {
+      speakerInfo.textContent = data.adminFreeMode
+        ? 'Mode admin : doublage gratuit généré.'
+        : `Doublage terminé. Minute(s) restante(s) : ${Number(data.wallet?.token_balance || 0)}.`;
+    }
+
+    if (walletBadge && data.wallet && !data.adminFreeMode) {
+      const balance = Number(data.wallet.token_balance || 0);
+      walletBadge.textContent = `${balance} min`;
+      walletBadge.classList.toggle('ok-badge', balance > 0);
+      walletBadge.classList.toggle('muted-badge', balance <= 0);
+    }
+
+    if (data.dubbedVideoUrl && finalVideo) {
+      const videoUrl = absoluteUrl(baseUrl, data.dubbedVideoUrl);
+      finalVideo.src = videoUrl;
+      finalVideo.classList.remove('hidden');
+      finalVideo.load();
+      if (downloadVideoBtn) {
+        downloadVideoBtn.href = videoUrl;
+        downloadVideoBtn.classList.remove('hidden');
+        downloadVideoBtn.setAttribute('download', 'viralvoice-video-doublee.mp4');
+      }
+    }
+
+    if (data.dubbedAudioUrl && finalAudio) {
+      const audioUrl = absoluteUrl(baseUrl, data.dubbedAudioUrl);
+      finalAudio.src = audioUrl;
+      finalAudio.classList.remove('hidden');
+      finalAudio.load();
+      if (downloadAudioBtn) {
+        downloadAudioBtn.href = audioUrl;
+        downloadAudioBtn.classList.remove('hidden');
+        downloadAudioBtn.setAttribute('download', 'viralvoice-voix-traduite.mp3');
+      }
+    }
+
+    if (resultCard) {
+      resultCard.classList.remove('hidden');
+      setTimeout(() => {
+        try {
+          resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch {
+          // Scroll facultatif.
+        }
+      }, 150);
+    }
+
+    if (statusText) statusText.textContent = 'Terminé';
+    if (statusCard) statusCard.classList.add('hidden');
+
+    if (userStatus) {
+      userStatus.textContent = 'Doublage terminé et récupéré automatiquement.';
+      userStatus.className = 'notice user-status success';
+      userStatus.classList.remove('hidden');
+    }
+
+    if (dubBtn) {
+      dubBtn.disabled = false;
+      dubBtn.textContent = '⚡ Créer mon doublage';
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent('viralvoice:result-ready', {
+        detail: { ...data, recovered: true, baseUrl }
+      }));
+    } catch {
+      // Compatibilité anciens WebView.
+    }
+
+    return true;
+  }
+
+  async function pollResult(baseUrl, token, state = {}) {
+    const startedAt = Number(state.startedAt || Date.now());
+    setRecoveryStatus('Récupération automatique du résultat en cours…');
+
+    while (!state.cancelled && Date.now() - startedAt < RECOVERY_MAX_MS) {
       try {
         const response = await previousFetch(
           `${baseUrl}/api/recover-result?token=${encodeURIComponent(token)}&t=${Date.now()}`,
-          { method: 'GET', cache: 'no-store' }
+          {
+            method: 'GET',
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, max-age=0',
+              'Pragma': 'no-cache'
+            }
+          }
         );
 
         if (response.status === 200) {
-          const data = await response.clone().json().catch(() => null);
+          const data = await response.json().catch(() => null);
           if (data?.ok) {
-            setRecoveryStatus('Résultat récupéré. Affichage de la vidéo…');
-            return new Response(JSON.stringify(data), {
-              status: 200,
-              headers: {
-                'Content-Type': 'application/json',
-                'X-ViralVoice-Recovered': '1'
-              }
-            });
+            return data;
           }
         }
       } catch {
-        // Une coupure temporaire ne doit pas relancer la génération OpenAI.
+        // Une coupure temporaire ne doit jamais relancer OpenAI.
       }
-      await sleep(POLL_MS);
+
+      if (!state.cancelled) await sleep(POLL_MS);
     }
 
-    throw new Error('Le résultat n’a pas pu être récupéré automatiquement. Réessaie dans quelques secondes sans relancer immédiatement une nouvelle génération.');
+    if (state.cancelled) return null;
+    throw new Error('Le résultat n’a pas pu être récupéré automatiquement dans le délai prévu.');
+  }
+
+  function responseFromRecovered(data) {
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-ViralVoice-Recovered': '1'
+      }
+    });
+  }
+
+  async function resumePendingResult() {
+    const active = readActive();
+    if (!active) return;
+
+    const state = { startedAt: Number(active.startedAt), cancelled: false };
+    try {
+      const data = await pollResult(active.baseUrl, active.token, state);
+      if (data?.ok) {
+        clearActive(active.token);
+        applyRecoveredResult(data, active.baseUrl);
+      }
+    } catch {
+      // On conserve le jeton jusqu'à expiration pour une prochaine ouverture.
+    }
   }
 
   window.fetch = async (input, init = {}) => {
@@ -79,30 +247,60 @@
       baseUrl = 'https://viralvoice.onrender.com';
     }
 
-    let originalDone = false;
+    saveActive(baseUrl, token);
+    const state = { startedAt: Date.now(), cancelled: false };
+
     const originalRequest = previousFetch(input, init).then(
-      response => {
-        originalDone = true;
-        return response;
-      },
-      error => {
-        originalDone = true;
-        throw error;
-      }
+      response => ({ kind: 'original', response }),
+      error => ({ kind: 'original-error', error })
     );
 
-    const delayedRecovery = (async () => {
-      await sleep(RECOVERY_DELAY_MS);
-      if (originalDone) return originalRequest;
-      return recover(baseUrl, token);
-    })();
+    const recoveryRequest = (async () => {
+      await sleep(POLL_START_DELAY_MS);
+      const data = await pollResult(baseUrl, token, state);
+      if (!data) return { kind: 'cancelled' };
+      return { kind: 'recovered', data };
+    })().catch(error => ({ kind: 'recovery-error', error }));
 
-    try {
-      return await Promise.race([originalRequest, delayedRecovery]);
-    } catch (error) {
-      // Si la réponse principale s'est perdue après l'envoi, récupérer le résultat
-      // existant au lieu de refaire et repayer la génération.
-      return recover(baseUrl, token).catch(() => { throw error; });
+    const first = await Promise.race([originalRequest, recoveryRequest]);
+
+    if (first.kind === 'original') {
+      state.cancelled = true;
+      clearActive(token);
+      return first.response;
     }
+
+    if (first.kind === 'recovered') {
+      state.cancelled = true;
+      clearActive(token);
+      setRecoveryStatus('Résultat récupéré. Affichage de la vidéo…');
+      return responseFromRecovered(first.data);
+    }
+
+    if (first.kind === 'original-error') {
+      const recovered = await recoveryRequest;
+      if (recovered.kind === 'recovered') {
+        state.cancelled = true;
+        clearActive(token);
+        return responseFromRecovered(recovered.data);
+      }
+      throw first.error;
+    }
+
+    const original = await originalRequest;
+    if (original.kind === 'original') {
+      state.cancelled = true;
+      clearActive(token);
+      return original.response;
+    }
+    throw original.error || first.error || new Error('Erreur de récupération du doublage.');
   };
+
+  setTimeout(resumePendingResult, 1200);
+  window.addEventListener('pageshow', () => setTimeout(resumePendingResult, 500));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      setTimeout(resumePendingResult, 500);
+    }
+  });
 })();
