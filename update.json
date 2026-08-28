@@ -1,8 +1,8 @@
 {
   "versionCode": 29,
   "versionName": "4.1.0",
-  "title": "ViralVoice 4.1.0 est disponible",
-  "notes": "Nouvelle version compilée, signée et prête à installer. Tes données restent conservées.",
+  "title": "ViralVoice 4.1.0 Stable est disponible",
+  "notes": "Interface reconstruite pour supprimer les scripts concurrents, restaurer une navigation fluide et fiabiliser la sélection vidéo. Tes données restent conservées.",
   "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/ViralVoice-4.1.0.apk",
   "required": false
 }
