@@ -8,7 +8,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -29,19 +28,21 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class UpdateManager {
 
-    private static final String UPDATE_MANIFEST_URL =
-            "https://chasmet.github.io/ViralVoice/update.json";
+    private static final String[] UPDATE_MANIFEST_URLS = new String[]{
+            "https://chasmet.github.io/ViralVoice/update.json",
+            "https://raw.githubusercontent.com/Chasmet/ViralVoice/main/update.json"
+    };
     private static final String PREFS = "viralvoice-native-updater";
     private static final String KEY_LAST_CHECK = "last-check";
     private static final String KEY_DOWNLOAD_ID = "download-id";
-    private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
+    private static final String KEY_DOWNLOAD_VERSION = "download-version";
+    private static final long PASSIVE_CHECK_INTERVAL_MS = 15L * 60L * 1000L;
 
     private final Activity activity;
     private final DownloadManager downloadManager;
     private final SharedPreferences preferences;
     private final AtomicBoolean checking = new AtomicBoolean(false);
     private boolean receiverRegistered = false;
-    private String pendingVersionName = "mise à jour";
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override
@@ -49,10 +50,7 @@ public final class UpdateManager {
             if (!DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(intent.getAction())) {
                 return;
             }
-            long completedId = intent.getLongExtra(
-                    DownloadManager.EXTRA_DOWNLOAD_ID,
-                    -1L
-            );
+            long completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
             long expectedId = preferences.getLong(KEY_DOWNLOAD_ID, -1L);
             if (completedId == expectedId && completedId != -1L) {
                 promptInstallIfReady(completedId);
@@ -62,32 +60,54 @@ public final class UpdateManager {
 
     public UpdateManager(Activity activity) {
         this.activity = activity;
-        this.downloadManager = (DownloadManager) activity.getSystemService(
-                Context.DOWNLOAD_SERVICE
-        );
+        this.downloadManager = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
         this.preferences = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         registerReceiver();
     }
 
     public void checkForUpdates(boolean force) {
+        checkForUpdates(force, false);
+    }
+
+    public void checkForUpdates(boolean force, boolean showUpToDate) {
         long now = System.currentTimeMillis();
         long lastCheck = preferences.getLong(KEY_LAST_CHECK, 0L);
-        if (!force && now - lastCheck < CHECK_INTERVAL_MS) {
+        if (!force && now - lastCheck < PASSIVE_CHECK_INTERVAL_MS) {
             return;
         }
         if (!checking.compareAndSet(false, true)) {
+            if (showUpToDate) {
+                toast("Vérification de mise à jour déjà en cours…");
+            }
             return;
         }
 
-        preferences.edit().putLong(KEY_LAST_CHECK, now).apply();
+        if (showUpToDate) {
+            toast("Recherche de mise à jour…");
+        }
+
         new Thread(() -> {
             try {
                 UpdateInfo info = fetchUpdateInfo();
-                if (info != null && info.versionCode > BuildConfig.VERSION_CODE) {
-                    activity.runOnUiThread(() -> showUpdateDialog(info));
+                if (info == null) {
+                    if (showUpToDate) {
+                        toast("Impossible de vérifier la mise à jour pour le moment.");
+                    }
+                    return;
                 }
-            } catch (Exception ignored) {
-                // Une panne réseau ne doit jamais bloquer ViralVoice.
+
+                // On mémorise uniquement une vérification réellement réussie.
+                preferences.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply();
+
+                if (info.versionCode > BuildConfig.VERSION_CODE) {
+                    activity.runOnUiThread(() -> showUpdateDialog(info));
+                } else if (showUpToDate) {
+                    toast("ViralVoice " + BuildConfig.VERSION_NAME + " est déjà à jour.");
+                }
+            } catch (Exception error) {
+                if (showUpToDate) {
+                    toast("Vérification impossible. Réessaie dans quelques instants.");
+                }
             } finally {
                 checking.set(false);
             }
@@ -116,32 +136,41 @@ public final class UpdateManager {
     private void registerReceiver() {
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            activity.registerReceiver(
-                    downloadReceiver,
-                    filter,
-                    Context.RECEIVER_EXPORTED
-            );
+            activity.registerReceiver(downloadReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
             activity.registerReceiver(downloadReceiver, filter);
         }
         receiverRegistered = true;
     }
 
-    private UpdateInfo fetchUpdateInfo() throws Exception {
+    private UpdateInfo fetchUpdateInfo() {
+        for (String manifestUrl : UPDATE_MANIFEST_URLS) {
+            try {
+                UpdateInfo info = fetchUpdateInfoFrom(manifestUrl);
+                if (info != null) {
+                    return info;
+                }
+            } catch (Exception ignored) {
+                // Essaie la source suivante.
+            }
+        }
+        return null;
+    }
+
+    private UpdateInfo fetchUpdateInfoFrom(String manifestUrl) throws Exception {
         HttpURLConnection connection = null;
         try {
-            URL url = new URL(
-                    UPDATE_MANIFEST_URL + "?t=" + System.currentTimeMillis()
-            );
+            String separator = manifestUrl.contains("?") ? "&" : "?";
+            URL url = new URL(manifestUrl + separator + "t=" + System.currentTimeMillis());
             connection = (HttpURLConnection) url.openConnection();
-            connection.setConnectTimeout(8000);
-            connection.setReadTimeout(8000);
+            connection.setConnectTimeout(7000);
+            connection.setReadTimeout(7000);
             connection.setUseCaches(false);
+            connection.setDefaultUseCaches(false);
             connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty(
-                    "User-Agent",
-                    "ViralVoiceAndroid/" + BuildConfig.VERSION_NAME
-            );
+            connection.setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0");
+            connection.setRequestProperty("Pragma", "no-cache");
+            connection.setRequestProperty("User-Agent", "ViralVoiceAndroid/" + BuildConfig.VERSION_NAME);
 
             int status = connection.getResponseCode();
             if (status < 200 || status >= 300) {
@@ -157,20 +186,10 @@ public final class UpdateManager {
             String notes = root.optString("notes", "Améliorations et corrections.").trim();
             boolean required = root.optBoolean("required", false);
 
-            if (versionCode <= 0
-                    || TextUtils.isEmpty(versionName)
-                    || !isTrustedApkUrl(apkUrl)) {
+            if (versionCode <= 0 || TextUtils.isEmpty(versionName) || !isTrustedApkUrl(apkUrl)) {
                 return null;
             }
-
-            return new UpdateInfo(
-                    versionCode,
-                    versionName,
-                    apkUrl,
-                    title,
-                    notes,
-                    required
-            );
+            return new UpdateInfo(versionCode, versionName, apkUrl, title, notes, required);
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -181,8 +200,7 @@ public final class UpdateManager {
     private String readAll(InputStream stream) throws Exception {
         StringBuilder builder = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(stream, StandardCharsets.UTF_8)
-        )) {
+                new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 builder.append(line).append('\n');
@@ -202,7 +220,8 @@ public final class UpdateManager {
         String host = uri.getHost();
         return "github.com".equalsIgnoreCase(host)
                 || "objects.githubusercontent.com".equalsIgnoreCase(host)
-                || "githubusercontent.com".equalsIgnoreCase(host);
+                || "githubusercontent.com".equalsIgnoreCase(host)
+                || "raw.githubusercontent.com".equalsIgnoreCase(host);
     }
 
     private void showUpdateDialog(UpdateInfo info) {
@@ -210,20 +229,16 @@ public final class UpdateManager {
             return;
         }
 
-        String message =
-                info.notes
-                        + "\n\nVersion installée : " + BuildConfig.VERSION_NAME
-                        + "\nNouvelle version : " + info.versionName
-                        + "\n\nTes données, ton compteur, tes réglages et ton localStorage "
-                        + "restent conservés pendant la mise à jour.";
+        String message = info.notes
+                + "\n\nVersion installée : " + BuildConfig.VERSION_NAME
+                + "\nNouvelle version : " + info.versionName
+                + "\n\nTes données, ton compteur, tes réglages et ton localStorage "
+                + "restent conservés pendant la mise à jour.";
 
         AlertDialog.Builder builder = new AlertDialog.Builder(activity)
                 .setTitle(info.title)
                 .setMessage(message)
-                .setPositiveButton(
-                        "Télécharger en arrière-plan",
-                        (dialog, which) -> startDownload(info)
-                );
+                .setPositiveButton("Télécharger maintenant", (dialog, which) -> startDownload(info));
 
         if (!info.required) {
             builder.setNegativeButton("Plus tard", null);
@@ -239,48 +254,30 @@ public final class UpdateManager {
         try {
             long existingId = preferences.getLong(KEY_DOWNLOAD_ID, -1L);
             if (existingId != -1L && isDownloadActive(existingId)) {
-                Toast.makeText(
-                        activity,
-                        "La mise à jour est déjà en cours de téléchargement.",
-                        Toast.LENGTH_LONG
-                ).show();
+                toast("La mise à jour est déjà en cours de téléchargement.");
                 return;
             }
 
-            pendingVersionName = info.versionName;
             String fileName = "ViralVoice-" + info.versionName + ".apk";
-            DownloadManager.Request request = new DownloadManager.Request(
-                    Uri.parse(info.apkUrl)
-            );
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(info.apkUrl));
             request.setTitle("ViralVoice " + info.versionName);
             request.setDescription("Téléchargement de la mise à jour");
             request.setMimeType("application/vnd.android.package-archive");
-            request.setNotificationVisibility(
-                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
-            );
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             request.setAllowedOverMetered(true);
             request.setAllowedOverRoaming(true);
-            request.setDestinationInExternalFilesDir(
-                    activity,
-                    Environment.DIRECTORY_DOWNLOADS,
-                    fileName
-            );
+            request.setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_DOWNLOADS, fileName);
 
             long downloadId = downloadManager.enqueue(request);
-            preferences.edit().putLong(KEY_DOWNLOAD_ID, downloadId).apply();
+            preferences.edit()
+                    .putLong(KEY_DOWNLOAD_ID, downloadId)
+                    .putString(KEY_DOWNLOAD_VERSION, info.versionName)
+                    .apply();
 
-            Toast.makeText(
-                    activity,
-                    "ViralVoice " + info.versionName
-                            + " se télécharge en arrière-plan. Tu peux continuer à utiliser l’application.",
-                    Toast.LENGTH_LONG
-            ).show();
+            toast("ViralVoice " + info.versionName
+                    + " se télécharge en arrière-plan. Tu peux continuer à utiliser l’application.");
         } catch (Exception error) {
-            Toast.makeText(
-                    activity,
-                    "Impossible de démarrer la mise à jour.",
-                    Toast.LENGTH_LONG
-            ).show();
+            toast("Impossible de démarrer la mise à jour.");
         }
     }
 
@@ -313,7 +310,7 @@ public final class UpdateManager {
             }
             int status = cursor.getInt(statusIndex);
             if (status == DownloadManager.STATUS_FAILED) {
-                preferences.edit().remove(KEY_DOWNLOAD_ID).apply();
+                clearDownloadState();
                 return;
             }
             if (status != DownloadManager.STATUS_SUCCESSFUL) {
@@ -323,32 +320,26 @@ public final class UpdateManager {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && !activity.getPackageManager().canRequestPackageInstalls()) {
-            Toast.makeText(
-                    activity,
-                    "Autorise ViralVoice à installer sa mise à jour, puis reviens dans l’application.",
-                    Toast.LENGTH_LONG
-            ).show();
+            toast("Autorise ViralVoice à installer sa mise à jour, puis reviens dans l’application.");
             Intent permissionIntent = new Intent(
                     Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    Uri.parse("package:" + activity.getPackageName())
-            );
+                    Uri.parse("package:" + activity.getPackageName()));
             activity.startActivity(permissionIntent);
             return;
         }
 
         Uri apkUri = downloadManager.getUriForDownloadedFile(downloadId);
         if (apkUri == null) {
-            preferences.edit().remove(KEY_DOWNLOAD_ID).apply();
+            clearDownloadState();
             return;
         }
 
+        String versionName = preferences.getString(KEY_DOWNLOAD_VERSION, "mise à jour");
         new AlertDialog.Builder(activity)
                 .setTitle("Mise à jour prête")
-                .setMessage(
-                        "ViralVoice " + pendingVersionName
-                                + " est téléchargé. Appuie sur Installer pour terminer. "
-                                + "Tes données resteront conservées."
-                )
+                .setMessage("ViralVoice " + versionName
+                        + " est téléchargé. Appuie sur Installer pour terminer. "
+                        + "Tes données resteront conservées.")
                 .setPositiveButton("Installer", (dialog, which) -> installApk(apkUri))
                 .setNegativeButton("Plus tard", null)
                 .show();
@@ -357,19 +348,20 @@ public final class UpdateManager {
     private void installApk(Uri apkUri) {
         try {
             Intent install = new Intent(Intent.ACTION_VIEW);
-            install.setDataAndType(
-                    apkUri,
-                    "application/vnd.android.package-archive"
-            );
+            install.setDataAndType(apkUri, "application/vnd.android.package-archive");
             install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             activity.startActivity(install);
         } catch (Exception error) {
-            Toast.makeText(
-                    activity,
-                    "Android n’a pas pu ouvrir l’installateur de mise à jour.",
-                    Toast.LENGTH_LONG
-            ).show();
+            toast("Android n’a pas pu ouvrir l’installateur de mise à jour.");
         }
+    }
+
+    private void clearDownloadState() {
+        preferences.edit().remove(KEY_DOWNLOAD_ID).remove(KEY_DOWNLOAD_VERSION).apply();
+    }
+
+    private void toast(String message) {
+        activity.runOnUiThread(() -> Toast.makeText(activity, message, Toast.LENGTH_LONG).show());
     }
 
     private static final class UpdateInfo {
@@ -380,14 +372,8 @@ public final class UpdateManager {
         final String notes;
         final boolean required;
 
-        UpdateInfo(
-                int versionCode,
-                String versionName,
-                String apkUrl,
-                String title,
-                String notes,
-                boolean required
-        ) {
+        UpdateInfo(int versionCode, String versionName, String apkUrl,
+                   String title, String notes, boolean required) {
             this.versionCode = versionCode;
             this.versionName = versionName;
             this.apkUrl = apkUrl;
