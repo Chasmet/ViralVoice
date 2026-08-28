@@ -1,8 +1,8 @@
 {
-  "versionCode": 18,
-  "versionName": "4.0.5",
-  "title": "ViralVoice 4.0.5 est disponible",
-  "notes": "Traduction et doublage nettement plus rapides grâce au traitement parallèle contrôlé. Interface Android plus fluide avec cache WebView conservé et vérification de mise à jour décalée après l'affichage.",
-  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.5/ViralVoice-4.0.5.apk",
+  "versionCode": 19,
+  "versionName": "4.0.6",
+  "title": "ViralVoice 4.0.6 est disponible",
+  "notes": "Rendu encore plus rapide : jusqu'à 4 générations OpenAI vocales en parallèle, recalage FFmpeg limité à 2 tâches pour garder Render fluide, finalisation rapide conservée et chronométrage interne des étapes pour mesurer les prochains doublages.",
+  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.6/ViralVoice-4.0.6.apk",
   "required": false
 }
