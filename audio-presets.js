@@ -47,40 +47,38 @@ function applyAudioPreset(presetName) {
   });
 }
 
-// Runtime réseau anti-cache.
+// V4.0.5 : cache versionné. Le navigateur ne retélécharge plus ces scripts à
+// chaque ouverture, mais une nouvelle version reste immédiatement récupérée
+// dès que le numéro ?v= change.
 (() => {
   const previous = document.getElementById('viralvoiceRuntime402');
   if (previous) previous.remove();
 
   const runtime = document.createElement('script');
   runtime.id = 'viralvoiceRuntime402';
-  runtime.src = `runtime-v402.js?v=404&t=${Date.now()}`;
+  runtime.src = 'runtime-v402.js?v=405';
   runtime.async = false;
   document.head.appendChild(runtime);
 })();
 
-// Compteur privé du budget API OpenAI.
 (() => {
   const previous = document.getElementById('viralvoiceAdminBudget403');
   if (previous) previous.remove();
 
   const counter = document.createElement('script');
   counter.id = 'viralvoiceAdminBudget403';
-  counter.src = `admin-budget-counter.js?v=404&t=${Date.now()}`;
+  counter.src = 'admin-budget-counter.js?v=405';
   counter.async = false;
   document.head.appendChild(counter);
 })();
 
-// Migration vers la première signature Android stable. Sur les anciennes
-// versions le script sauvegarde automatiquement les données non sensibles ;
-// sur 4.0.4 il les restaure après la reconnexion admin.
 (() => {
   const previous = document.getElementById('viralvoiceMigrationBackup404');
   if (previous) previous.remove();
 
   const migration = document.createElement('script');
   migration.id = 'viralvoiceMigrationBackup404';
-  migration.src = `migration-backup.js?v=404&t=${Date.now()}`;
+  migration.src = 'migration-backup.js?v=405';
   migration.async = false;
   document.head.appendChild(migration);
 })();
