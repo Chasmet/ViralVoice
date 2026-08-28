@@ -1,12 +1,12 @@
 {
   "name": "viralvoice-backend",
-  "version": "4.0.8",
-  "description": "Point de déploiement Render pour ViralVoice 4.0.8, finalisation rapide et bornée.",
+  "version": "4.0.9",
+  "description": "Point de déploiement Render pour ViralVoice 4.0.9 avec récupération des résultats terminés après coupure mobile.",
   "main": "../server-v3.js",
   "type": "commonjs",
   "scripts": {
-    "start": "NODE_PATH=./node_modules node -r ../runtime-limits.js -r ../lib/fast-mux-patch.js -r ../lib/ci-signing-bridge.js ../server-v3.js",
-    "check": "NODE_PATH=./node_modules node --check ../server-v3.js && node --check ../runtime-limits.js && node --check ../lib/config.js && node --check ../lib/utils.js && node --check ../lib/database.js && node --check ../lib/media.js && node --check ../lib/media-extra.js && node --check ../lib/speech-sync.js && node --check ../lib/realtime-translate.js && node --check ../lib/quality-voice.js && node --check ../lib/fast-finalize.js && node --check ../lib/fast-mux.js && node --check ../lib/fast-mux-patch.js && node --check ../lib/auto-dubbing.js && node --check ../lib/ci-signing-bridge.js"
+    "start": "NODE_PATH=./node_modules node -r ../runtime-limits.js -r ../lib/result-recovery-patch.js -r ../lib/fast-mux-patch.js -r ../lib/ci-signing-bridge.js ../server-v3.js",
+    "check": "NODE_PATH=./node_modules node --check ../server-v3.js && node --check ../runtime-limits.js && node --check ../lib/config.js && node --check ../lib/utils.js && node --check ../lib/database.js && node --check ../lib/media.js && node --check ../lib/media-extra.js && node --check ../lib/speech-sync.js && node --check ../lib/realtime-translate.js && node --check ../lib/quality-voice.js && node --check ../lib/fast-finalize.js && node --check ../lib/fast-mux.js && node --check ../lib/fast-mux-patch.js && node --check ../lib/result-recovery-patch.js && node --check ../lib/auto-dubbing.js && node --check ../lib/ci-signing-bridge.js"
   },
   "engines": {
     "node": ">=22"
