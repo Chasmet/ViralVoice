@@ -75,7 +75,7 @@ jobs:
           node --check migration-backup.js
           node --check web-updater.js
           node --check recovery-client.js
-          node -e "const u=require('./update.json'); if(u.versionCode!==24 || u.versionName!=='4.0.11') process.exit(1)"
+          node -e "const u=require('./update.json'); if(u.versionCode!==25 || u.versionName!=='4.0.12') process.exit(1)"
           cd backend
           npm install --no-audit --no-fund
           npm run check
@@ -160,10 +160,10 @@ jobs:
         shell: bash
         run: |
           test -f android/app/build/outputs/apk/release/app-release.apk
-          cp android/app/build/outputs/apk/release/app-release.apk ViralVoice-4.0.11.apk
+          cp android/app/build/outputs/apk/release/app-release.apk ViralVoice-4.0.12.apk
           {
             echo "status=success"
-            echo "version=4.0.11"
+            echo "version=4.0.12"
             echo "signed=stable-release"
             echo "signer_sha256=AD:54:87:3D:60:DF:3C:0E:78:15:1E:6E:F9:1C:CE:FA:B4:7D:D3:01:61:24:10:23:7C:57:95:4B:4D:85:9C:E6"
             echo "commit=${GITHUB_SHA}"
@@ -176,8 +176,8 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: ViralVoice-4.0.11-APK
-          path: ViralVoice-4.0.11.apk
+          name: ViralVoice-4.0.12-APK
+          path: ViralVoice-4.0.12.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -186,7 +186,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p /tmp/viralvoice-apk
-          cp ViralVoice-4.0.11.apk build-status.txt /tmp/viralvoice-apk/
+          cp ViralVoice-4.0.12.apk build-status.txt /tmp/viralvoice-apk/
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -195,7 +195,7 @@ jobs:
           git clean -fdx
           cp /tmp/viralvoice-apk/* .
           git add .
-          git commit -m "Publish stable-signed ViralVoice 4.0.11 APK ${GITHUB_SHA}"
+          git commit -m "Publish stable-signed ViralVoice 4.0.12 APK ${GITHUB_SHA}"
           git push --force origin HEAD:apk-builds
 
       - name: Create or update GitHub Release
@@ -204,15 +204,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v4.0.11"
-          TITLE="ViralVoice v4.0.11"
-          NOTES="ViralVoice 4.0.11 : restauration du compteur privé admin, accès administrateur fiabilisé par le mot de passe sauvegardé et ajout rapide de minutes directement en haut de l'application. Correctif injecté nativement pour éviter les problèmes de cache. Même signature stable : données conservées."
+          TAG="v4.0.12"
+          TITLE="ViralVoice v4.0.12"
+          NOTES="ViralVoice 4.0.12 : mises à jour nettement plus rapides. Téléchargement APK direct dans l'application avec progression immédiate, URL APK directe via la branche apk-builds et DownloadManager seulement en secours. Même signature stable : données conservées."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" ViralVoice-4.0.11.apk --clobber
+            gh release upload "$TAG" ViralVoice-4.0.12.apk --clobber
             gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --latest
           else
-            gh release create "$TAG" ViralVoice-4.0.11.apk \
+            gh release create "$TAG" ViralVoice-4.0.12.apk \
               --target main \
               --title "$TITLE" \
               --notes "$NOTES" \
