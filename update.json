@@ -1,8 +1,8 @@
 {
-  "versionCode": 20,
-  "versionName": "4.0.7",
-  "title": "ViralVoice 4.0.7 est disponible",
-  "notes": "Correction du système de mise à jour : vérification forcée à chaque ouverture, cache désactivé pour le manifeste, secours direct GitHub et bouton manuel Vérifier les mises à jour dans la zone admin. Les optimisations de vitesse 4.0.6 sont conservées.",
-  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.7/ViralVoice-4.0.7.apk",
+  "versionCode": 21,
+  "versionName": "4.0.8",
+  "title": "ViralVoice 4.0.8 est disponible",
+  "notes": "Correction du blocage sur Préparation du fichier final : finalisation audio allégée, mux vidéo borné avec secours rapide et deuxième système de mise à jour directement dans l'interface ViralVoice.",
+  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.8/ViralVoice-4.0.8.apk",
   "required": false
 }
