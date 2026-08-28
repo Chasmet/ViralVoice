@@ -18,6 +18,7 @@ on:
       - 'audio-presets.js'
       - 'runtime-v402.js'
       - 'admin-budget-counter.js'
+      - 'migration-backup.js'
       - 'update.json'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
@@ -35,6 +36,7 @@ on:
       - 'audio-presets.js'
       - 'runtime-v402.js'
       - 'admin-budget-counter.js'
+      - 'migration-backup.js'
       - 'update.json'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
@@ -63,6 +65,7 @@ jobs:
           npm run check
           node --check runtime-v402.js
           node --check admin-budget-counter.js
+          node --check migration-backup.js
           node -e "const u=require('./update.json'); if(u.versionCode!==17 || u.versionName!=='4.0.4') process.exit(1)"
           cd backend
           npm install --no-audit --no-fund
@@ -194,7 +197,7 @@ jobs:
         run: |
           TAG="v4.0.4"
           TITLE="ViralVoice v4.0.4"
-          NOTES="ViralVoice 4.0.4 : première base à signature Android stable pour toutes les futures mises à jour intégrées. Téléchargement des prochaines versions directement dans l'application, sans perdre le localStorage ni le compteur lors des mises à jour par-dessus cette version. Priorité automatique à la qualité vocale OpenAI : gpt-audio-1.5 reçoit l'extrait source de chaque réplique comme référence de prosodie, rythme et émotion. Compteur budget admin conservé."
+          NOTES="ViralVoice 4.0.4 : première base à signature Android stable pour toutes les futures mises à jour intégrées. Téléchargement des prochaines versions directement dans l'application. Sauvegarde de migration Supabase pour récupérer le compteur et les réglages non sensibles lors du passage depuis les anciennes APK à signature de test. Priorité automatique à la qualité vocale OpenAI avec référence audio source par réplique."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" ViralVoice-4.0.4.apk --clobber
