@@ -1,7 +1,7 @@
 {
   "name": "viralvoice-backend",
-  "version": "4.0.4",
-  "description": "Point de déploiement Render pour ViralVoice 4.0.4 Auto OpenAI priorité qualité.",
+  "version": "4.0.5",
+  "description": "Point de déploiement Render pour ViralVoice 4.0.5 haute qualité accélérée.",
   "main": "../server-v3.js",
   "type": "commonjs",
   "scripts": {
