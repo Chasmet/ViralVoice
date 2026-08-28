@@ -1,11 +1,15 @@
-html{scroll-behavior:auto!important}
-body{background:#070a14!important;background-image:none!important}
+html{scroll-behavior:auto!important;overscroll-behavior-y:contain}
+body{background:#070a14!important;background-image:none!important;text-rendering:optimizeSpeed}
 body::before,body::after,.app::before,.app::after{display:none!important}
 .card,.status,.vv-space-switch,.workflow-nav,.action-dock{
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important;
   background:#11182d!important;
   box-shadow:0 5px 16px rgba(0,0,0,.22)!important
+}
+.card,.status{
+  content-visibility:auto;
+  contain-intrinsic-size:auto 420px
 }
 .workflow-nav,.action-dock{
   position:relative!important;
@@ -18,6 +22,7 @@ body::before,body::after,.app::before,.app::after{display:none!important}
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important
 }
+button,a,input,select,label,summary{touch-action:manipulation}
 *{animation-duration:.25s!important;transition-duration:.12s!important}
 .loader{animation-duration:.85s!important}
 .source-preview-hidden{display:none!important}
