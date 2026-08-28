@@ -22,7 +22,6 @@ on:
       - 'migration-backup.js'
       - 'web-updater.js'
       - 'recovery-client.js'
-      - 'update.json'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
   pull_request:
@@ -43,7 +42,6 @@ on:
       - 'migration-backup.js'
       - 'web-updater.js'
       - 'recovery-client.js'
-      - 'update.json'
       - 'index.html'
       - '.github/workflows/android-apk.yml'
 
@@ -58,6 +56,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve Android version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_NAME="$(sed -n "s/^[[:space:]]*versionName[[:space:]]*'\([^']*\)'.*/\1/p" android/app/build.gradle | head -n1)"
+          VERSION_CODE="$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*\([0-9][0-9]*\).*/\1/p' android/app/build.gradle | head -n1)"
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "APK_NAME=ViralVoice-$VERSION_NAME.apk" >> "$GITHUB_ENV"
 
       - name: Node 22
         uses: actions/setup-node@v4
@@ -75,7 +85,6 @@ jobs:
           node --check migration-backup.js
           node --check web-updater.js
           node --check recovery-client.js
-          node -e "const u=require('./update.json'); if(u.versionCode!==26 || u.versionName!=='4.0.13') process.exit(1)"
           cd backend
           npm install --no-audit --no-fund
           npm run check
@@ -159,11 +168,13 @@ jobs:
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
+          set -euo pipefail
           test -f android/app/build/outputs/apk/release/app-release.apk
-          cp android/app/build/outputs/apk/release/app-release.apk ViralVoice-4.0.13.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK_NAME"
           {
             echo "status=success"
-            echo "version=4.0.13"
+            echo "version=$VERSION_NAME"
+            echo "version_code=$VERSION_CODE"
             echo "signed=stable-release"
             echo "signer_sha256=AD:54:87:3D:60:DF:3C:0E:78:15:1E:6E:F9:1C:CE:FA:B4:7D:D3:01:61:24:10:23:7C:57:95:4B:4D:85:9C:E6"
             echo "commit=${GITHUB_SHA}"
@@ -176,17 +187,28 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: ViralVoice-4.0.13-APK
-          path: ViralVoice-4.0.13.apk
+          name: ViralVoice-${{ env.VERSION_NAME }}-APK
+          path: ${{ env.APK_NAME }}
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish latest APK branch
+      - name: Publish APK and manifest atomically
         if: github.event_name == 'push'
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p /tmp/viralvoice-apk
-          cp ViralVoice-4.0.13.apk build-status.txt /tmp/viralvoice-apk/
+          cp "$APK_NAME" build-status.txt /tmp/viralvoice-apk/
+          cat > /tmp/viralvoice-apk/update.json <<EOF
+          {
+            "versionCode": ${VERSION_CODE},
+            "versionName": "${VERSION_NAME}",
+            "title": "ViralVoice ${VERSION_NAME} est disponible",
+            "notes": "Nouvelle version compilée, signée et prête à installer. Tes données restent conservées.",
+            "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/${APK_NAME}",
+            "required": false
+          }
+          EOF
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -195,7 +217,7 @@ jobs:
           git clean -fdx
           cp /tmp/viralvoice-apk/* .
           git add .
-          git commit -m "Publish stable-signed ViralVoice 4.0.13 APK ${GITHUB_SHA}"
+          git commit -m "Publish stable-signed ViralVoice ${VERSION_NAME} APK ${GITHUB_SHA}"
           git push --force origin HEAD:apk-builds
 
       - name: Create or update GitHub Release
@@ -204,17 +226,41 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v4.0.13"
-          TITLE="ViralVoice v4.0.13"
-          NOTES="ViralVoice 4.0.13 : correction du retour des résultats. Le jeton de génération est sauvegardé sur le téléphone, la récupération démarre automatiquement quelques secondes après l'envoi et reprend après retour dans l'application. Aucun deuxième appel OpenAI ni deuxième débit de minutes. Même signature stable : données conservées."
+          set -euo pipefail
+          TAG="v${VERSION_NAME}"
+          TITLE="ViralVoice v${VERSION_NAME}"
+          NOTES="ViralVoice ${VERSION_NAME} : APK stable signé. La mise à jour n'est annoncée dans l'application qu'une fois le fichier réellement publié. Tes données restent conservées."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" ViralVoice-4.0.13.apk --clobber
+            gh release upload "$TAG" "$APK_NAME" --clobber
             gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --latest
           else
-            gh release create "$TAG" ViralVoice-4.0.13.apk \
+            gh release create "$TAG" "$APK_NAME" \
               --target main \
               --title "$TITLE" \
               --notes "$NOTES" \
               --latest
+          fi
+
+      - name: Publish update manifest to main only after APK exists
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          cat > update.json <<EOF
+          {
+            "versionCode": ${VERSION_CODE},
+            "versionName": "${VERSION_NAME}",
+            "title": "ViralVoice ${VERSION_NAME} est disponible",
+            "notes": "Nouvelle version compilée, signée et prête à installer. Tes données restent conservées.",
+            "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/${APK_NAME}",
+            "required": false
+          }
+          EOF
+          git add update.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Publie le manifeste ViralVoice ${VERSION_NAME} après l'APK"
+            git push origin main
           fi
