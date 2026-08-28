@@ -1,7 +1,7 @@
 {
   "name": "viralvoice",
-  "version": "4.0.4",
-  "description": "ViralVoice - doublage IA automatique OpenAI avec priorité qualité et mises à jour intégrées.",
+  "version": "4.0.5",
+  "description": "ViralVoice - doublage IA OpenAI haute qualité avec traitement parallèle contrôlé et mises à jour intégrées.",
   "main": "server-v3.js",
   "type": "commonjs",
   "scripts": {
