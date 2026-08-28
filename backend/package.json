@@ -1,7 +1,7 @@
 {
   "name": "viralvoice-backend",
-  "version": "4.0.5",
-  "description": "Point de déploiement Render pour ViralVoice 4.0.5 haute qualité accélérée.",
+  "version": "4.0.6",
+  "description": "Point de déploiement Render pour ViralVoice 4.0.6 haute qualité accélérée API/FFmpeg.",
   "main": "../server-v3.js",
   "type": "commonjs",
   "scripts": {
