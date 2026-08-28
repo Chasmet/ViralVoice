@@ -1,7 +1,7 @@
 {
   "name": "viralvoice-backend",
-  "version": "4.0.13",
-  "description": "Point de déploiement Render pour ViralVoice 4.0.13 avec récupération persistante des résultats terminés après coupure mobile.",
+  "version": "4.0.14",
+  "description": "Point de déploiement Render pour ViralVoice 4.0.14 avec récupération persistante Supabase et panneau admin unifié.",
   "main": "../server-v3.js",
   "type": "commonjs",
   "scripts": {
