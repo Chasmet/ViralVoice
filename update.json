@@ -1,8 +1,8 @@
 {
-  "versionCode": 22,
-  "versionName": "4.0.9",
-  "title": "ViralVoice 4.0.9 est disponible",
-  "notes": "Correction du vrai blocage mobile : si Render termine mais que la réponse HTTP se perd, ViralVoice récupère automatiquement le résultat déjà généré sans relancer OpenAI ni redébiter les minutes. Les optimisations 4.0.8 sont conservées.",
-  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.9/ViralVoice-4.0.9.apk",
+  "versionCode": 23,
+  "versionName": "4.0.10",
+  "title": "ViralVoice 4.0.10 est disponible",
+  "notes": "Ajout d'une vraie barre de progression native pour les mises à jour : téléchargement visible de 0 à 100 %, état APK prêt puis ouverture de l'installation Android. Les données restent conservées.",
+  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.10/ViralVoice-4.0.10.apk",
   "required": false
 }
