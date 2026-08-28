@@ -45,9 +45,10 @@ function loadVersionedScript(id, src) {
   document.head.appendChild(script);
 }
 
-// V4.0.8 : les modules distants sont versionnés. L'updater web est indépendant
-// du module Android afin que même une ancienne APK puisse proposer la MAJ.
-loadVersionedScript('viralvoiceRuntime402', 'runtime-v402.js?v=408');
-loadVersionedScript('viralvoiceAdminBudget403', 'admin-budget-counter.js?v=408');
-loadVersionedScript('viralvoiceMigrationBackup404', 'migration-backup.js?v=408');
-loadVersionedScript('viralvoiceWebUpdater408', 'web-updater.js?v=408');
+// V4.0.9 : double sécurité. L'updater web reste indépendant du natif et
+// recovery-client récupère un résultat terminé si la réponse POST se perd.
+loadVersionedScript('viralvoiceRuntime402', 'runtime-v402.js?v=409');
+loadVersionedScript('viralvoiceAdminBudget403', 'admin-budget-counter.js?v=409');
+loadVersionedScript('viralvoiceMigrationBackup404', 'migration-backup.js?v=409');
+loadVersionedScript('viralvoiceWebUpdater409', 'web-updater.js?v=409');
+loadVersionedScript('viralvoiceRecoveryClient409', 'recovery-client.js?v=409');
