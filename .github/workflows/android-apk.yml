@@ -41,6 +41,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build-apk:
@@ -50,10 +51,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Node 20
+      - name: Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Validate ViralVoice backend and audio regression
         shell: bash
@@ -78,7 +79,64 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build debug APK
+      - name: Fetch protected Android signing key
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          OIDC_RESPONSE="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=viralvoice-android-signing")"
+          OIDC_TOKEN="$(printf '%s' "$OIDC_RESPONSE" | jq -r '.value')"
+          test -n "$OIDC_TOKEN"
+          test "$OIDC_TOKEN" != "null"
+
+          SIGNING_JSON="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            https://viralvoice.onrender.com/api/ci/android-signing)"
+
+          STORE_PASSWORD="$(printf '%s' "$SIGNING_JSON" | jq -r '.storePassword')"
+          KEY_ALIAS="$(printf '%s' "$SIGNING_JSON" | jq -r '.keyAlias')"
+          KEY_PASSWORD="$(printf '%s' "$SIGNING_JSON" | jq -r '.keyPassword')"
+          KEYSTORE_B64="$(printf '%s' "$SIGNING_JSON" | jq -r '.keystoreBase64')"
+
+          test -n "$STORE_PASSWORD" && test "$STORE_PASSWORD" != "null"
+          test -n "$KEY_ALIAS" && test "$KEY_ALIAS" != "null"
+          test -n "$KEY_PASSWORD" && test "$KEY_PASSWORD" != "null"
+          test -n "$KEYSTORE_B64" && test "$KEYSTORE_B64" != "null"
+
+          echo "::add-mask::$STORE_PASSWORD"
+          echo "::add-mask::$KEY_PASSWORD"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/viralvoice-release.p12"
+          chmod 600 "$RUNNER_TEMP/viralvoice-release.p12"
+
+          {
+            echo "PLAY_UPLOAD_KEYSTORE_PATH=$RUNNER_TEMP/viralvoice-release.p12"
+            echo "PLAY_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "PLAY_KEY_ALIAS=$KEY_ALIAS"
+            echo "PLAY_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          gradle -p android wrapper --gradle-version 8.7
+          cd android
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Verify stable update signature
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          keytool -printcert -jarfile "$APK" > /tmp/viralvoice-cert.txt
+          grep -F "SHA256: AD:54:87:3D:60:DF:3C:0E:78:15:1E:6E:F9:1C:CE:FA:B4:7D:D3:01:61:24:10:23:7C:57:95:4B:4D:85:9C:E6" /tmp/viralvoice-cert.txt
+
+      - name: Build PR debug APK
+        if: github.event_name == 'pull_request'
         shell: bash
         run: |
           gradle -p android wrapper --gradle-version 8.7
@@ -86,13 +144,16 @@ jobs:
           ./gradlew assembleDebug --stacktrace
 
       - name: Prepare single APK
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
-          test -f android/app/build/outputs/apk/debug/app-debug.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk ViralVoice-4.0.4.apk
+          test -f android/app/build/outputs/apk/release/app-release.apk
+          cp android/app/build/outputs/apk/release/app-release.apk ViralVoice-4.0.4.apk
           {
             echo "status=success"
             echo "version=4.0.4"
+            echo "signed=stable-release"
+            echo "signer_sha256=AD:54:87:3D:60:DF:3C:0E:78:15:1E:6E:F9:1C:CE:FA:B4:7D:D3:01:61:24:10:23:7C:57:95:4B:4D:85:9C:E6"
             echo "commit=${GITHUB_SHA}"
             echo "branch=${GITHUB_REF_NAME}"
             echo "workflow_run=${GITHUB_RUN_ID}"
@@ -100,6 +161,7 @@ jobs:
           } > build-status.txt
 
       - name: Upload APK artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: ViralVoice-4.0.4-APK
@@ -121,7 +183,7 @@ jobs:
           git clean -fdx
           cp /tmp/viralvoice-apk/* .
           git add .
-          git commit -m "Publish ViralVoice 4.0.4 APK ${GITHUB_SHA}"
+          git commit -m "Publish stable-signed ViralVoice 4.0.4 APK ${GITHUB_SHA}"
           git push --force origin HEAD:apk-builds
 
       - name: Create or update GitHub Release
@@ -132,7 +194,7 @@ jobs:
         run: |
           TAG="v4.0.4"
           TITLE="ViralVoice v4.0.4"
-          NOTES="ViralVoice 4.0.4 : mises à jour directement dans l'application avec téléchargement en arrière-plan et installation Android, sans perdre le localStorage ni le compteur lors d'une mise à jour par-dessus l'application. Priorité automatique à la qualité vocale OpenAI : gpt-audio-1.5 reçoit désormais l'extrait source de chaque réplique comme référence de prosodie, de rythme et d'émotion. Le moteur Realtime reste disponible en secours. Compteur budget admin 10 USD / 12 USD TTC conservé."
+          NOTES="ViralVoice 4.0.4 : première base à signature Android stable pour toutes les futures mises à jour intégrées. Téléchargement des prochaines versions directement dans l'application, sans perdre le localStorage ni le compteur lors des mises à jour par-dessus cette version. Priorité automatique à la qualité vocale OpenAI : gpt-audio-1.5 reçoit l'extrait source de chaque réplique comme référence de prosodie, rythme et émotion. Compteur budget admin conservé."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" ViralVoice-4.0.4.apk --clobber
