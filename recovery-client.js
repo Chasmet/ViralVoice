@@ -30,7 +30,7 @@
 
   async function recover(baseUrl, token) {
     const startedAt = Date.now();
-    setRecoveryStatus('Le serveur a peut-être fini. Récupération du résultat…');
+    setRecoveryStatus('Le serveur a fini ou va finir. Récupération automatique du résultat…');
 
     while (Date.now() - startedAt < RECOVERY_MAX_MS) {
       try {
@@ -53,12 +53,12 @@
           }
         }
       } catch {
-        // La récupération est volontairement tolérante aux coupures réseau.
+        // Une coupure temporaire ne doit pas relancer la génération OpenAI.
       }
       await sleep(POLL_MS);
     }
 
-    throw new Error('Le serveur a fini ou la connexion a été interrompue, mais le résultat n’a pas pu être récupéré automatiquement.');
+    throw new Error('Le résultat n’a pas pu être récupéré automatiquement. Réessaie dans quelques secondes sans relancer immédiatement une nouvelle génération.');
   }
 
   window.fetch = async (input, init = {}) => {
@@ -79,17 +79,29 @@
       baseUrl = 'https://viralvoice.onrender.com';
     }
 
-    const originalRequest = previousFetch(input, init);
+    let originalDone = false;
+    const originalRequest = previousFetch(input, init).then(
+      response => {
+        originalDone = true;
+        return response;
+      },
+      error => {
+        originalDone = true;
+        throw error;
+      }
+    );
+
     const delayedRecovery = (async () => {
       await sleep(RECOVERY_DELAY_MS);
+      if (originalDone) return originalRequest;
       return recover(baseUrl, token);
     })();
 
     try {
       return await Promise.race([originalRequest, delayedRecovery]);
     } catch (error) {
-      // Une vraie erreur réseau après l'envoi ne doit pas forcer l'utilisateur
-      // à refaire la génération : on tente d'abord de récupérer le résultat.
+      // Si la réponse principale s'est perdue après l'envoi, récupérer le résultat
+      // existant au lieu de refaire et repayer la génération.
       return recover(baseUrl, token).catch(() => { throw error; });
     }
   };
