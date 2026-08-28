@@ -1,8 +1,8 @@
 {
-  "versionCode": 24,
-  "versionName": "4.0.11",
-  "title": "ViralVoice 4.0.11 est disponible",
-  "notes": "Restaure le compteur privé admin, l'accès aux réglages administrateur et l'ajout rapide de minutes. Le correctif est injecté nativement pour éviter les problèmes de cache. Les données restent conservées.",
-  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.11/ViralVoice-4.0.11.apk",
+  "versionCode": 25,
+  "versionName": "4.0.12",
+  "title": "ViralVoice 4.0.12 est disponible",
+  "notes": "Mises à jour plus rapides : téléchargement APK direct dans ViralVoice avec progression immédiate. Le gestionnaire Android ne sert plus que de secours. Les données restent conservées.",
+  "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/ViralVoice-4.0.12.apk",
   "required": false
 }
