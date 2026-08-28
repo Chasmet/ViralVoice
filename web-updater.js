@@ -4,7 +4,13 @@
   const MANIFEST_URL = 'https://chasmet.github.io/ViralVoice/update.json';
   const ua = String(navigator.userAgent || '');
   const installedMatch = ua.match(/ViralVoiceAndroid\/(\d+\.\d+\.\d+)/i);
-  const installedVersion = installedMatch ? installedMatch[1] : '';
+  let installedVersion = installedMatch ? installedMatch[1] : '';
+
+  try {
+    if (window.ViralVoiceUpdater && typeof window.ViralVoiceUpdater.currentVersion === 'function') {
+      installedVersion = String(window.ViralVoiceUpdater.currentVersion() || installedVersion).trim();
+    }
+  } catch {}
 
   function compareVersions(a, b) {
     const aa = String(a || '').split('.').map(Number);
@@ -16,6 +22,15 @@
       if (left < right) return -1;
     }
     return 0;
+  }
+
+  function updateVisibleVersion() {
+    if (!installedVersion) return;
+    document.querySelectorAll('.version-pill').forEach(node => {
+      node.textContent = installedVersion;
+    });
+    const footer = document.querySelector('.app-footer strong');
+    if (footer) footer.textContent = `ViralVoice Pro ${installedVersion}`;
   }
 
   async function fetchManifest() {
@@ -85,6 +100,7 @@
   }
 
   async function run() {
+    updateVisibleVersion();
     if (!installedVersion) return;
     try {
       const info = await fetchManifest();
