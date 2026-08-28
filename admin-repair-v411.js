@@ -1,17 +1,15 @@
 (() => {
   'use strict';
 
-  if (window.__VIRALVOICE_ADMIN_REPAIR_V411) return;
-  window.__VIRALVOICE_ADMIN_REPAIR_V411 = true;
+  if (window.__VIRALVOICE_ADMIN_REPAIR_CURRENT) return;
+  window.__VIRALVOICE_ADMIN_REPAIR_CURRENT = true;
 
   const ADMIN_SECRET_KEY = 'viralvoice-admin-secret';
   const CLIENT_EMAIL_KEY = 'viralvoice-client-email';
-  const BUDGET_KEY = 'viralvoice-admin-api-budget-v403';
-  const ADMIN_EMAIL = 'skypieachannel@gmail.com';
   const DEFAULT_BACKEND = 'https://viralvoice.onrender.com';
 
   const clean = value => String(value || '').trim();
-  const email = value => clean(value).toLowerCase();
+  const normalizeEmail = value => clean(value).toLowerCase();
 
   function savedSecret() {
     try { return clean(localStorage.getItem(ADMIN_SECRET_KEY)); } catch { return ''; }
@@ -19,7 +17,7 @@
 
   function currentClientEmail() {
     const field = document.getElementById('clientEmail');
-    return email(field?.value || localStorage.getItem(CLIENT_EMAIL_KEY) || ADMIN_EMAIL);
+    return normalizeEmail(field?.value || localStorage.getItem(CLIENT_EMAIL_KEY) || '');
   }
 
   function backendUrl() {
@@ -28,18 +26,34 @@
     return value.startsWith('https://') ? value.replace(/\/+$/, '') : DEFAULT_BACKEND;
   }
 
+  function installedVersion() {
+    try {
+      if (window.ViralVoiceUpdater && typeof window.ViralVoiceUpdater.currentVersion === 'function') {
+        const value = clean(window.ViralVoiceUpdater.currentVersion());
+        if (value) return value;
+      }
+    } catch {}
+    const match = String(navigator.userAgent || '').match(/ViralVoiceAndroid\/(\d+\.\d+\.\d+)/i);
+    return match ? match[1] : '';
+  }
+
   function isAdminReady() {
     return Boolean(savedSecret()) || document.body.classList.contains('admin-email-active');
   }
 
+  function removeLegacyDuplicate() {
+    document.getElementById('adminQuick411')?.remove();
+    document.getElementById('adminQuick411Style')?.remove();
+  }
+
   function ensureBudgetScript() {
     if (document.getElementById('apiBudgetCounter')) return;
-    if (document.getElementById('viralvoiceBudget411')) return;
+    if (document.getElementById('viralvoiceBudgetCurrent')) return;
     const script = document.createElement('script');
-    script.id = 'viralvoiceBudget411';
-    script.src = `admin-budget-counter.js?v=411&t=${Date.now()}`;
+    script.id = 'viralvoiceBudgetCurrent';
+    script.src = `admin-budget-counter.js?v=414&t=${Date.now()}`;
     script.async = false;
-    script.onload = () => window.setTimeout(syncAdminUi, 100);
+    script.onload = () => window.setTimeout(syncAdminUi, 80);
     document.head.appendChild(script);
   }
 
@@ -54,100 +68,70 @@
     if (secretField && !secretField.value && savedSecret()) secretField.value = savedSecret();
 
     const target = document.getElementById('adminClientEmail');
-    if (target && !target.value) target.value = currentClientEmail() || ADMIN_EMAIL;
+    if (target && !target.value && currentClientEmail()) target.value = currentClientEmail();
 
+    document.getElementById('apiBudgetCounter')?.classList.add('visible');
+  }
+
+  function installMinutesControls() {
+    if (!isAdminReady()) return;
     const budget = document.getElementById('apiBudgetCounter');
-    if (budget) budget.classList.add('visible');
-  }
+    if (!budget || document.getElementById('apiBudgetMinutesAdmin')) return;
 
-  function budgetState() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(BUDGET_KEY) || '{}');
-      return {
-        credit: Number(parsed.apiCreditUsd || 10),
-        spent: Number(parsed.spentApiUsd || 0),
-        videos: Number(parsed.videos || 0),
-        minutes: Number(parsed.minutes || 0)
-      };
-    } catch {
-      return { credit: 10, spent: 0, videos: 0, minutes: 0 };
+    const version = installedVersion();
+    const box = document.createElement('details');
+    box.id = 'apiBudgetMinutesAdmin';
+    box.className = 'api-budget-minutes-admin';
+    box.open = false;
+    box.innerHTML = `
+      <summary>Ajouter des minutes client${version ? ` · ViralVoice ${escapeHtml(version)}` : ''}</summary>
+      <div class="api-budget-minutes-grid">
+        <label>Email à créditer
+          <input id="apiBudgetMinutesEmail" type="email" autocomplete="email" value="${escapeHtml(currentClientEmail())}" />
+        </label>
+        <label>Minutes
+          <input id="apiBudgetMinutesValue" type="number" min="1" step="1" value="5" inputmode="numeric" />
+        </label>
+      </div>
+      <button id="apiBudgetMinutesAdd" type="button">Ajouter les minutes</button>
+      <div id="apiBudgetMinutesStatus" class="notice hidden"></div>
+    `;
+    budget.appendChild(box);
+
+    if (!document.getElementById('api-budget-minutes-admin-style')) {
+      const style = document.createElement('style');
+      style.id = 'api-budget-minutes-admin-style';
+      style.textContent = `
+        .api-budget-minutes-admin{margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}
+        .api-budget-minutes-admin summary{cursor:pointer;color:#c7d2ec;font-size:.78rem;font-weight:800}
+        .api-budget-minutes-grid{display:grid;grid-template-columns:1.7fr .65fr;gap:9px;margin-top:11px}
+        .api-budget-minutes-grid label{font-size:.7rem;color:#9faecc;min-width:0}
+        .api-budget-minutes-grid input{box-sizing:border-box;width:100%;min-width:0;margin-top:5px;padding:11px;border-radius:12px;border:1px solid rgba(141,165,225,.22);background:#090f22;color:#fff;font-size:.9rem}
+        #apiBudgetMinutesAdd{width:100%;margin-top:9px;padding:11px;border:0;border-radius:13px;background:linear-gradient(90deg,#36d7ff,#765dff,#ef4eb8);color:white;font-weight:900}
+        #apiBudgetMinutesStatus{margin-top:9px}
+        @media(max-width:560px){.api-budget-minutes-grid{grid-template-columns:1fr 92px}}
+      `;
+      document.head.appendChild(style);
     }
+
+    document.getElementById('apiBudgetMinutesAdd')?.addEventListener('click', addMinutes);
   }
 
-  function money(value) {
-    return `${Math.max(0, Number(value || 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
-  }
-
-  function installQuickAdminCard() {
-    if (!isAdminReady() || document.getElementById('adminQuick411')) return;
-    const app = document.querySelector('main.app');
-    if (!app) return;
-
-    const state = budgetState();
-    const remaining = Math.max(0, state.credit - state.spent);
-    const section = document.createElement('section');
-    section.id = 'adminQuick411';
-    section.className = 'card admin-quick-411';
-    section.innerHTML = `
-      <div class="aq-head">
-        <div><p class="section-kicker">PRIVÉ ADMIN</p><h2>Minutes & budget API</h2></div>
-        <span class="badge ok-badge">4.0.11</span>
-      </div>
-      <div class="aq-stats">
-        <div><small>Reste API</small><strong id="aqRemaining">${money(remaining)}</strong></div>
-        <div><small>Dépensé</small><strong id="aqSpent">${money(state.spent)}</strong></div>
-        <div><small>Vidéos</small><strong id="aqVideos">${Math.round(state.videos)}</strong></div>
-        <div><small>Minutes</small><strong id="aqMinutes">${Number(state.minutes).toFixed(1)}</strong></div>
-      </div>
-      <div class="aq-add">
-        <label>Email à créditer<input id="aqEmail" type="email" value="${escapeHtml(currentClientEmail() || ADMIN_EMAIL)}" /></label>
-        <label>Minutes<input id="aqMinutesInput" type="number" min="1" step="1" value="5" /></label>
-        <button id="aqAddBtn" type="button" class="primary">Ajouter les minutes</button>
-      </div>
-      <div id="aqStatus" class="notice hidden"></div>
-      <button id="aqOpenAdmin" type="button" class="secondary full">Ouvrir tous les réglages admin</button>
-    `;
-
-    const hero = app.querySelector('.hero');
-    if (hero) app.insertBefore(section, hero);
-    else app.prepend(section);
-
-    const style = document.createElement('style');
-    style.id = 'adminQuick411Style';
-    style.textContent = `
-      .admin-quick-411{margin:10px 0 18px;border:1px solid rgba(65,220,255,.3);background:linear-gradient(145deg,rgba(12,24,48,.98),rgba(8,13,29,.98))}
-      .aq-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.aq-head h2{margin:2px 0 0}
-      .aq-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.aq-stats>div{padding:11px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(125,155,225,.15)}
-      .aq-stats small{display:block;color:#9aa8c8;font-size:.68rem}.aq-stats strong{display:block;margin-top:4px;color:#fff;font-size:1.02rem}
-      .aq-add{display:grid;grid-template-columns:1.6fr .7fr 1fr;gap:8px;align-items:end;margin:10px 0}.aq-add label{font-size:.72rem;color:#9faecc}.aq-add input{width:100%;box-sizing:border-box;margin-top:5px}
-      #aqAddBtn{min-height:48px}.admin-quick-411 .notice{margin:10px 0}
-      @media(max-width:620px){.aq-stats{grid-template-columns:1fr 1fr}.aq-add{grid-template-columns:1fr 110px}.aq-add #aqAddBtn{grid-column:1/-1}}
-    `;
-    document.head.appendChild(style);
-
-    document.getElementById('aqOpenAdmin')?.addEventListener('click', () => {
-      restoreAdminPanel();
-      document.getElementById('adminPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-
-    document.getElementById('aqAddBtn')?.addEventListener('click', addMinutesQuick);
-  }
-
-  async function addMinutesQuick() {
-    const button = document.getElementById('aqAddBtn');
-    const status = document.getElementById('aqStatus');
-    const targetEmail = email(document.getElementById('aqEmail')?.value);
-    const minutes = Math.floor(Number(document.getElementById('aqMinutesInput')?.value || 0));
+  async function addMinutes() {
+    const button = document.getElementById('apiBudgetMinutesAdd');
+    const status = document.getElementById('apiBudgetMinutesStatus');
+    const targetEmail = normalizeEmail(document.getElementById('apiBudgetMinutesEmail')?.value);
+    const minutes = Math.floor(Number(document.getElementById('apiBudgetMinutesValue')?.value || 0));
     const secret = savedSecret();
 
-    const show = (text, type) => {
+    const show = (text, type = '') => {
       if (!status) return;
       status.textContent = text;
-      status.className = `notice ${type || ''}`.trim();
+      status.className = `notice ${type}`.trim();
       status.classList.remove('hidden');
     };
 
-    if (!secret) return show('Mot de passe admin manquant. Ouvre les réglages admin et sauvegarde-le.', 'error');
+    if (!secret) return show('Mot de passe admin manquant.', 'error');
     if (!targetEmail) return show('Entre un email valide.', 'error');
     if (!Number.isInteger(minutes) || minutes <= 0) return show('Entre un nombre de minutes supérieur à 0.', 'error');
 
@@ -156,8 +140,16 @@
       show('Ajout des minutes…', 'loading');
       const response = await fetch(`${backendUrl()}/api/admin/add-tokens`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret },
-        body: JSON.stringify({ email: targetEmail, tokens: minutes, packName: 'Ajout rapide admin', amountEur: 0 })
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-secret': secret
+        },
+        body: JSON.stringify({
+          email: targetEmail,
+          tokens: minutes,
+          packName: 'Ajout admin intégré',
+          amountEur: 0
+        })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || 'Impossible d’ajouter les minutes.');
@@ -185,37 +177,37 @@
     }
   }
 
-  function syncBudgetVisibility() {
-    if (!isAdminReady()) return;
-    const budget = document.getElementById('apiBudgetCounter');
-    if (budget) budget.classList.add('visible');
-  }
-
   function syncVersion() {
-    document.querySelectorAll('.version-pill').forEach(node => { node.textContent = '4.0.11'; });
+    const version = installedVersion();
+    if (!version) return;
+    document.querySelectorAll('.version-pill').forEach(node => { node.textContent = version; });
     const footer = document.querySelector('.app-footer strong');
-    if (footer) footer.textContent = 'ViralVoice Pro 4.0.11';
+    if (footer) footer.textContent = `ViralVoice Pro ${version}`;
   }
 
   function syncAdminUi() {
+    removeLegacyDuplicate();
+    syncVersion();
     if (!isAdminReady()) return;
     restoreAdminPanel();
     ensureBudgetScript();
-    syncBudgetVisibility();
-    installQuickAdminCard();
-    syncVersion();
+    document.getElementById('apiBudgetCounter')?.classList.add('visible');
+    installMinutesControls();
   }
 
   function escapeHtml(value) {
-    return String(value || '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+    return String(value || '').replace(/[&<>"']/g, char => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    }[char]));
   }
 
   const start = () => {
-    syncVersion();
     syncAdminUi();
-    document.addEventListener('click', () => window.setTimeout(syncAdminUi, 50), true);
-    document.getElementById('adminSecretInput')?.addEventListener('input', () => window.setTimeout(syncAdminUi, 50));
-    window.setInterval(syncAdminUi, 1200);
+    document.addEventListener('click', () => window.setTimeout(syncAdminUi, 60), true);
+    document.getElementById('adminSecretInput')?.addEventListener('input', () => window.setTimeout(syncAdminUi, 60));
+
+    const observer = new MutationObserver(() => syncAdminUi());
+    observer.observe(document.body, { childList: true, subtree: true });
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
