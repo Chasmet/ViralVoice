@@ -2,7 +2,7 @@
   "versionCode": 26,
   "versionName": "4.0.13",
   "title": "ViralVoice 4.0.13 est disponible",
-  "notes": "Corrige définitivement le retour du résultat : récupération automatique quelques secondes après l'envoi, jeton sauvegardé sur le téléphone et restauration après retour dans l'application. Aucune deuxième génération OpenAI ni deuxième consommation de minutes.",
+  "notes": "Nouvelle version compilée, signée et prête à installer. Tes données restent conservées.",
   "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/ViralVoice-4.0.13.apk",
   "required": false
 }
