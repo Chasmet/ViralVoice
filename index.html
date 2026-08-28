@@ -5,49 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#070a14" />
   <meta name="background-color" content="#070a14" />
-  <meta name="description" content="ViralVoice traduit et double les voix de tes vidéos avec l’intelligence artificielle." />
-  <title>ViralVoice Pro — Doublage vidéo IA</title>
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-512.png?v=405" />
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=405" />
-  <link rel="apple-touch-icon" href="icon-512.png?v=405" />
-  <link rel="manifest" href="manifest.json?v=405" />
-  <link rel="stylesheet" href="style.css?v=405" />
-  <link rel="stylesheet" href="premium-ui.css?v=405" />
-  <link rel="stylesheet" href="refonte-v32.css?v=405" />
-  <link rel="stylesheet" href="performance-v35.css?v=405" />
+  <meta name="description" content="ViralVoice traduit et double automatiquement les voix des vidéos avec OpenAI." />
+  <title>ViralVoice — Doublage vidéo OpenAI</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=410" />
+  <link rel="apple-touch-icon" href="icon-512.png?v=410" />
+  <link rel="manifest" href="manifest.json?v=410" />
+  <link rel="stylesheet" href="stable-v410.css?v=410" />
 </head>
 <body>
-  <main class="app">
-    <header class="hero pro-hero">
-      <div class="brand-row">
-        <button id="adminLogoBtn" class="logo" type="button" aria-label="Ouvrir ViralVoice">
-          <img src="icon-512.png?v=405" alt="Logo ViralVoice" class="app-logo-img" />
-        </button>
-        <div class="brand-copy">
-          <div class="brand-kicker">
-            <span class="eyebrow">ViralVoice Pro</span>
-            <span class="version-pill">4.0.5</span>
+  <main class="app safe-scroll">
+    <section id="apiBudgetCounter" class="card api-budget hidden" aria-label="Compteur privé OpenAI">
+      <div class="api-budget-head">
+        <div>
+          <p class="section-kicker">Privé admin · OpenAI</p>
+          <h2>Suivi de mes <span id="apiBudgetTitleCredit">10,00 $</span></h2>
+        </div>
+        <span id="apiBudgetPaidBadge" class="badge">Payé 12,00 $ TTC</span>
+      </div>
+      <div class="api-budget-grid">
+        <div class="api-budget-metric"><small>Reste API</small><strong id="apiBudgetRemaining">10,00 $</strong></div>
+        <div class="api-budget-metric"><small>Dépensé API</small><strong id="apiBudgetSpent">0,00 $</strong></div>
+        <div class="api-budget-metric"><small>Vidéos</small><strong id="apiBudgetVideos">0</strong></div>
+        <div class="api-budget-metric"><small>Minutes</small><strong id="apiBudgetMinutes">0,0</strong></div>
+      </div>
+      <div class="api-budget-progress" aria-hidden="true"><span id="apiBudgetProgress"></span></div>
+      <div id="apiBudgetDetail" class="hint">Coût réel TTC estimé : 0,00 $</div>
+      <details class="inline-details">
+        <summary>Régler / recharger mon compteur</summary>
+        <div class="details-body">
+          <div class="grid">
+            <label>Crédit ajouté chez OpenAI ($)
+              <input id="budgetCreditInput" type="number" min="0.01" step="0.01" value="10" inputmode="decimal" />
+            </label>
+            <label>Montant réellement payé TTC ($)
+              <input id="budgetPaidInput" type="number" min="0.01" step="0.01" value="12" inputmode="decimal" />
+            </label>
           </div>
-          <p class="brand-tagline">Studio mobile de doublage IA</p>
+          <div class="actions two">
+            <button id="budgetNewCycleBtn" class="secondary" type="button">Nouveau cycle</button>
+            <button id="budgetAddCreditBtn" class="secondary" type="button">Ajouter la recharge</button>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <header class="hero">
+      <div class="brand-row">
+        <button id="adminLogoBtn" class="logo" type="button" aria-label="Logo ViralVoice">
+          <img src="icon-512.png?v=410" alt="Logo ViralVoice" />
+        </button>
+        <div>
+          <div class="brand-kicker">
+            <span class="eyebrow">ViralVoice Auto</span>
+            <span class="version-pill">4.1.0</span>
+          </div>
+          <p class="brand-tagline">Studio de doublage OpenAI automatique</p>
         </div>
       </div>
-      <h1>Ta vidéo. Une nouvelle langue. La même énergie.</h1>
-      <p class="subtitle">Importe ton fichier, choisis les voix, puis récupère directement la vidéo finale prête à publier.</p>
-      <div class="hero-points" aria-label="Fonctions principales">
-        <span><strong>5 min</strong> par vidéo</span>
-        <span><strong>Multi-voix</strong> automatique</span>
-        <span><strong>MP4</strong> prêt à télécharger</span>
+      <h1>Ta vidéo entre.<br />ViralVoice s’occupe du reste.</h1>
+      <p class="subtitle">Choisis la langue. ViralVoice détecte les intervenants, adapte les voix, traduit et synchronise automatiquement le résultat.</p>
+      <div class="hero-points">
+        <span><strong>5 min</strong>par vidéo</span>
+        <span><strong>Auto</strong>multi-intervenants</span>
+        <span><strong>MP4</strong>prêt à publier</span>
       </div>
     </header>
 
-    <section class="card account-card compact-card" aria-labelledby="accountTitle">
+    <section class="card account-card" aria-labelledby="accountTitle">
       <div class="section-title">
         <div><p class="section-kicker">Compte</p><h2 id="accountTitle">Mes minutes</h2></div>
         <span id="walletBadge" class="badge muted-badge">0 min</span>
       </div>
       <label for="clientEmail">Email utilisé lors du paiement</label>
       <input id="clientEmail" type="email" placeholder="exemple@email.com" autocomplete="email" inputmode="email" />
-      <p class="hint">Utilise toujours le même email pour retrouver automatiquement ton solde.</p>
+      <p class="hint">Utilise toujours le même email pour retrouver automatiquement tes minutes.</p>
       <div class="actions two">
         <button id="checkWalletBtn" class="secondary" type="button">Vérifier mes minutes</button>
         <button id="clearClientBtn" class="secondary" type="button">Changer de compte</button>
@@ -62,28 +93,32 @@
       <span><b>4</b> Résultat</span>
     </nav>
 
-    <section id="projectCard" class="card workflow-card upload-card" aria-labelledby="uploadTitle">
+    <section id="projectCard" class="card upload-card" aria-labelledby="uploadTitle">
       <div class="step-heading">
         <span class="step-number">1</span>
         <div><p class="section-kicker">Nouveau projet</p><h2 id="uploadTitle">Choisir une vidéo ou un audio</h2></div>
       </div>
-      <label class="file-zone" for="mediaFile">
+      <button id="chooseFileBtn" class="file-zone" type="button">
         <span class="file-icon" aria-hidden="true">＋</span>
         <strong>Importer un fichier</strong>
         <small>MP4, MOV, WEBM, MP3, WAV ou M4A · maximum 5 minutes</small>
-      </label>
+      </button>
       <input id="mediaFile" type="file" accept="video/*,audio/*,.mp4,.mov,.webm,.mp3,.wav,.m4a" hidden />
       <div id="fileInfo" class="file-info">Aucun fichier sélectionné</div>
-      <video id="sourcePreview" playsinline class="media-preview source-preview-hidden hidden" aria-hidden="true"></video>
-      <audio id="sourceAudioPreview" class="media-preview source-preview-hidden hidden" aria-hidden="true"></audio>
+      <div class="file-actions">
+        <button id="changeFileBtn" class="secondary" type="button">Changer de vidéo / audio</button>
+        <button id="clearFileBtn" class="secondary" type="button">Retirer le fichier</button>
+      </div>
+      <video id="sourcePreview" controls playsinline preload="metadata" class="source-preview hidden"></video>
+      <audio id="sourceAudioPreview" controls preload="metadata" class="source-preview hidden"></audio>
     </section>
 
-    <section class="card workflow-card" aria-labelledby="languageTitle">
+    <section class="card" aria-labelledby="languageTitle">
       <div class="step-heading">
         <span class="step-number">2</span>
         <div><p class="section-kicker">Traduction</p><h2 id="languageTitle">Langue et voix principale</h2></div>
       </div>
-      <div class="grid compact-grid">
+      <div class="grid">
         <div>
           <label for="targetLang">Langue de sortie</label>
           <select id="targetLang">
@@ -110,208 +145,154 @@
       </div>
     </section>
 
-    <section class="card workflow-card voice-card" aria-labelledby="speakerTitle">
+    <section class="card" aria-labelledby="speakerTitle">
       <div class="step-heading">
         <span class="step-number">3</span>
-        <div><p class="section-kicker">Intervenants</p><h2 id="speakerTitle">Reconnaissance des voix</h2></div>
+        <div><p class="section-kicker">Intervenants</p><h2 id="speakerTitle">Reconnaissance automatique des voix</h2></div>
       </div>
-      <label class="switch-row main-switch" for="multiVoiceMode">
+      <label class="switch-row" for="multiVoiceMode">
         <input id="multiVoiceMode" type="checkbox" checked />
-        <span>
-          <strong>Adapter automatiquement la voix à chaque intervenant</strong>
-          <small>ViralVoice détecte le profil vocal perçu, choisit une voix féminine ou masculine et conserve les bons horodatages.</small>
-        </span>
+        <span><strong>Adapter la voix à chaque intervenant</strong><small>ViralVoice détecte automatiquement le nombre de personnes et choisit le traitement OpenAI adapté.</small></span>
       </label>
       <details class="inline-details">
         <summary>Choisir précisément les voix</summary>
-        <div class="grid compact-grid details-grid">
-          <div>
-            <label for="firstSpeakerRole">Attribution des voix</label>
-            <select id="firstSpeakerRole">
-              <option value="auto" selected>Automatique — recommandé</option>
-              <option value="female">La première voix est féminine</option>
-              <option value="male">La première voix est masculine</option>
-            </select>
-          </div>
-          <div>
-            <label for="maleVoice">Voix homme</label>
-            <select id="maleVoice">
-              <option value="cedar">Naturelle</option>
-              <option value="onyx">Très grave</option>
-              <option value="ash">Grave douce</option>
-              <option value="marin">Claire</option>
-            </select>
-          </div>
-          <div>
-            <label for="femaleVoice">Voix femme</label>
-            <select id="femaleVoice">
-              <option value="coral">Naturelle</option>
-              <option value="nova">Claire</option>
-              <option value="shimmer">Douce</option>
-              <option value="sage">Posée</option>
-            </select>
+        <div class="details-body">
+          <div class="grid">
+            <div>
+              <label for="firstSpeakerRole">Première voix</label>
+              <select id="firstSpeakerRole"><option value="auto" selected>Automatique</option><option value="female">Féminine</option><option value="male">Masculine</option></select>
+            </div>
+            <div>
+              <label for="maleVoice">Voix homme</label>
+              <select id="maleVoice"><option value="cedar">Naturelle</option><option value="onyx">Très grave</option><option value="ash">Grave douce</option><option value="marin">Claire</option></select>
+            </div>
+            <div>
+              <label for="femaleVoice">Voix femme</label>
+              <select id="femaleVoice"><option value="coral">Naturelle</option><option value="nova">Claire</option><option value="shimmer">Douce</option><option value="sage">Posée</option></select>
+            </div>
           </div>
         </div>
-        <p class="hint">Le mode automatique analyse brièvement le timbre de chaque intervenant. Utilise le réglage manuel uniquement si une voix est mal reconnue.</p>
       </details>
     </section>
 
-    <section class="card workflow-card mix-card" aria-labelledby="mixTitle">
+    <section class="card" aria-labelledby="mixTitle">
       <div class="step-heading">
         <span class="step-number">4</span>
-        <div><p class="section-kicker">Son final</p><h2 id="mixTitle">4. Mixage audio</h2></div>
+        <div><p class="section-kicker">Son final</p><h2 id="mixTitle">Mixage audio</h2></div>
       </div>
-      <p class="hint">Choisis un rendu rapide. Le mode équilibré convient à la majorité des vidéos.</p>
       <div class="preset-grid" role="radiogroup" aria-label="Préréglages audio">
-        <label class="preset-card" for="presetSolo">
-          <input id="presetSolo" name="audioPreset" type="radio" value="solo" />
-          <span class="preset-icon">🎙</span><strong>Voix seule</strong><small>Son original coupé.</small>
-        </label>
-        <label class="preset-card active" for="presetBalanced">
-          <input id="presetBalanced" name="audioPreset" type="radio" value="balanced" checked />
-          <span class="preset-icon">⚖</span><strong>Équilibré</strong><small>Réglage conseillé.</small>
-        </label>
-        <label class="preset-card" for="presetOriginal">
-          <input id="presetOriginal" name="audioPreset" type="radio" value="original" />
-          <span class="preset-icon">🎬</span><strong>Ambiance</strong><small>Plus de son original.</small>
-        </label>
-        <label class="preset-card" for="presetPower">
-          <input id="presetPower" name="audioPreset" type="radio" value="power" />
-          <span class="preset-icon">⚡</span><strong>Puissant</strong><small>Voix forte pour Shorts.</small>
-        </label>
+        <label class="preset-card"><input name="audioPreset" type="radio" value="solo" /><strong>🎙 Voix seule</strong><small>Son original coupé.</small></label>
+        <label class="preset-card active"><input name="audioPreset" type="radio" value="balanced" checked /><strong>⚖ Équilibré</strong><small>Réglage conseillé.</small></label>
+        <label class="preset-card"><input name="audioPreset" type="radio" value="original" /><strong>🎬 Ambiance</strong><small>Plus de son original.</small></label>
+        <label class="preset-card"><input name="audioPreset" type="radio" value="power" /><strong>⚡ Puissant</strong><small>Voix forte pour Shorts.</small></label>
       </div>
-      <details class="advanced-audio inline-details">
+      <details class="inline-details">
         <summary>Réglages audio avancés</summary>
-        <label for="voiceVolume">Volume de la voix IA</label>
-        <input id="voiceVolume" type="range" min="60" max="130" value="105" />
-        <div class="range-row"><span>Doux</span><strong id="voiceVolumeValue">105%</strong><span>Fort</span></div>
-        <label for="originalVolume">Volume du son original</label>
-        <input id="originalVolume" type="range" min="0" max="60" value="10" />
-        <div class="range-row"><span>Muet</span><strong id="originalVolumeValue">10%</strong><span>Fond</span></div>
+        <div class="details-body">
+          <label for="voiceVolume">Volume de la voix IA</label>
+          <input id="voiceVolume" type="range" min="60" max="130" value="105" />
+          <div class="range-row"><span>Doux</span><strong id="voiceVolumeValue">105%</strong><span>Fort</span></div>
+          <label for="originalVolume">Volume du son original</label>
+          <input id="originalVolume" type="range" min="0" max="60" value="10" />
+          <div class="range-row"><span>Muet</span><strong id="originalVolumeValue">10%</strong><span>Fond</span></div>
+        </div>
       </details>
+      <label class="switch-row" for="autoSaveMedia">
+        <input id="autoSaveMedia" type="checkbox" />
+        <span><strong>Enregistrer automatiquement sur mon téléphone</strong><small>Optionnel. Tu peux toujours choisir manuellement le dossier après génération.</small></span>
+      </label>
     </section>
 
     <div class="action-dock">
       <button id="dubBtn" class="primary" type="button">⚡ Créer mon doublage</button>
-      <p class="action-caption">GPT adapte chaque réplique à sa durée, puis génère les voix premium.</p>
+      <p class="action-caption">Détection, traduction, voix et synchronisation : tout est automatique.</p>
     </div>
 
-    <section id="statusCard" class="status processing-card hidden" aria-live="polite">
+    <section id="statusCard" class="status hidden" aria-live="polite">
       <div class="processing-topline">
         <div class="loader"></div>
-        <div><strong>ViralVoice travaille</strong><p id="statusText">Traitement en cours...</p></div>
+        <div><strong>ViralVoice travaille</strong><p id="statusText">Traitement en cours…</p></div>
       </div>
       <div class="processing-steps" aria-hidden="true">
-        <span data-stage="wake">Connexion</span>
-        <span data-stage="transcribe">Transcription</span>
-        <span data-stage="voice">Voix IA</span>
-        <span data-stage="final">Finalisation</span>
+        <span data-stage="wake">Connexion</span><span data-stage="transcribe">Transcription</span><span data-stage="voice">Voix IA</span><span data-stage="final">Finalisation</span>
       </div>
     </section>
-    <div id="userStatus" class="notice user-status hidden">Service en attente.</div>
+    <div id="userStatus" class="notice hidden"></div>
 
-    <section id="resultCard" class="card result-card hidden" tabindex="-1" aria-labelledby="resultTitle">
+    <section id="resultCard" class="card result-card hidden" aria-labelledby="resultTitle">
       <div class="result-header">
-        <span class="result-check" aria-hidden="true">✓</span>
-        <div><p class="section-kicker success-kicker">Génération terminée</p><h2 id="resultTitle">Ta vidéo finale est prête</h2></div>
+        <span class="result-check">✓</span>
+        <div><p class="section-kicker">Génération terminée</p><h2 id="resultTitle">Ta vidéo finale est prête</h2></div>
       </div>
-      <p id="speakerInfo" class="result-info">Voix générée par IA.</p>
+      <p id="speakerInfo" class="result-info">Voix générée par OpenAI.</p>
       <div class="final-media-shell">
-        <video id="finalVideo" controls playsinline class="media-preview hidden"></video>
-        <audio id="finalAudio" controls class="media-preview hidden"></audio>
+        <video id="finalVideo" controls playsinline class="hidden"></video>
+        <audio id="finalAudio" controls class="hidden"></audio>
       </div>
-      <div class="actions two result-actions">
+      <div class="actions two">
         <a id="downloadVideoBtn" class="download primary-download hidden" download>Télécharger la vidéo</a>
         <a id="downloadAudioBtn" class="download hidden" download>Télécharger l’audio</a>
       </div>
+      <button id="saveAsBtn" class="secondary full hidden" type="button">Enregistrer dans…</button>
       <details class="transcript-details">
         <summary>Voir le texte traduit</summary>
-        <div class="transcript-actions">
-          <button id="copyTextBtn" class="secondary small-button" type="button">Copier le texte</button>
-        </div>
-        <label for="outputText" class="sr-only">Texte traduit</label>
-        <textarea id="outputText" readonly></textarea>
+        <textarea id="outputText" readonly aria-label="Texte traduit"></textarea>
+        <div class="actions"><button id="copyTextBtn" class="secondary" type="button">Copier le texte</button></div>
       </details>
-      <button id="newDubBtn" class="secondary full new-project-btn" type="button">Créer un nouveau doublage</button>
+      <button id="newDubBtn" class="secondary full" type="button">Créer un nouveau doublage</button>
     </section>
 
-    <details class="card prices collapsible-card">
-      <summary>
-        <div><p class="section-kicker">Tarifs</p><h2>Acheter des minutes</h2></div>
-        <span class="badge">Revolut</span>
-      </summary>
-      <p class="hint">Tes minutes sont consommées selon la durée du fichier. Durée maximale par doublage : 5 minutes.</p>
+    <details class="card collapsible-card">
+      <summary><div><p class="section-kicker">Tarifs</p><h2>Acheter des minutes</h2></div><span class="badge">Revolut</span></summary>
       <div class="plans">
         <article class="plan"><h3>Découverte</h3><strong>1,99 €</strong><p>5 minutes</p><button class="buy-btn" type="button" data-plan="decouverte">Acheter</button></article>
         <article class="plan"><h3>Créateur</h3><strong>6,99 €</strong><p>30 minutes</p><button class="buy-btn" type="button" data-plan="createur">Acheter</button></article>
-        <article class="plan featured"><span>Populaire</span><h3>Viral</h3><strong>11,99 €</strong><p>60 minutes</p><button class="buy-btn" type="button" data-plan="viral">Acheter</button></article>
+        <article class="plan"><h3>Viral</h3><strong>11,99 €</strong><p>60 minutes</p><button class="buy-btn" type="button" data-plan="viral">Acheter</button></article>
         <article class="plan"><h3>Pro</h3><strong>29,99 €</strong><p>180 minutes</p><button class="buy-btn" type="button" data-plan="pro">Acheter</button></article>
       </div>
-      <div id="paymentStatus" class="notice hidden">Paiement en attente.</div>
+      <div id="paymentStatus" class="notice hidden"></div>
     </details>
 
     <section id="adminPanel" class="card admin-panel hidden">
-      <div class="section-title">
-        <div><p class="section-kicker">Administration</p><h2>Réglages administrateur</h2></div>
-        <span class="badge ok-badge">Privé</span>
-      </div>
-      <h3 class="admin-subtitle">Mode admin gratuit</h3>
+      <div class="section-title"><div><p class="section-kicker">Administration</p><h2>Réglages administrateur</h2></div><span id="adminVersionLabel" class="badge">ViralVoice 4.1.0</span></div>
+
+      <h3 class="admin-subtitle">Accès admin</h3>
+      <label for="adminSecretInput">Mot de passe admin</label>
+      <input id="adminSecretInput" type="password" autocomplete="current-password" />
+      <button id="saveAdminSecretBtn" class="secondary full" type="button">Sauvegarder l’accès admin</button>
+      <div id="adminFreeStatus" class="notice hidden"></div>
+
       <label class="switch-row" for="adminFreeMode">
         <input id="adminFreeMode" type="checkbox" />
-        <span><strong>Activer mes générations gratuites</strong><small>Ce mode ne consomme aucune minute.</small></span>
+        <span><strong>Mode admin gratuit</strong><small>Les doublages admin ne consomment pas les minutes client.</small></span>
       </label>
-      <label for="adminSecretInput">Mot de passe admin Render</label>
-      <input id="adminSecretInput" type="password" placeholder="ADMIN_SECRET" autocomplete="off" />
-      <button id="saveAdminSecretBtn" class="secondary full" type="button">Sauvegarder le mode admin</button>
-      <div id="adminFreeStatus" class="notice hidden">Mode admin en attente.</div>
 
-      <h3 class="admin-subtitle">Ajouter des minutes à un client</h3>
-      <label for="adminClientEmail">Email client à créditer</label>
-      <input id="adminClientEmail" type="email" placeholder="client@email.com" autocomplete="off" />
-      <label for="adminTokens">Nombre de minutes</label>
-      <input id="adminTokens" type="number" min="1" value="1" />
-      <label for="adminPackName">Nom du pack</label>
-      <input id="adminPackName" type="text" value="Ajout manuel" />
-      <label for="adminAmountEur">Montant payé</label>
-      <input id="adminAmountEur" type="number" min="0" step="0.01" value="0" />
-      <button id="adminAddTokensBtn" class="primary admin-primary" type="button">Ajouter les minutes</button>
-      <div id="adminAddTokensStatus" class="notice hidden">Ajout en attente.</div>
-
-      <h3 class="admin-subtitle">Backend Render</h3>
-      <label for="backendUrl">URL backend Render</label>
-      <input id="backendUrl" type="url" placeholder="https://viralvoice.onrender.com" autocomplete="off" />
-      <div class="actions two">
-        <button id="saveBackendBtn" class="secondary" type="button">Sauvegarder</button>
-        <button id="testBackendBtn" class="secondary" type="button">Tester</button>
+      <h3 class="admin-subtitle">Ajouter des minutes client</h3>
+      <div class="admin-grid">
+        <label>Email à créditer<input id="adminClientEmail" type="email" autocomplete="email" /></label>
+        <label>Minutes<input id="adminTokens" type="number" min="1" step="1" value="5" inputmode="numeric" /></label>
       </div>
-      <div id="backendStatus" class="notice">Service en attente.</div>
+      <button id="adminAddTokensBtn" class="primary" type="button">Ajouter les minutes</button>
+      <div id="adminAddTokensStatus" class="notice hidden"></div>
 
-      <h3 class="admin-subtitle">Liens de paiement</h3>
-      <label for="payDecouverte">Lien Découverte</label>
-      <input id="payDecouverte" type="url" placeholder="Lien du pack Découverte" />
-      <label for="payCreateur">Lien Créateur</label>
-      <input id="payCreateur" type="url" placeholder="Lien du pack Créateur" />
-      <label for="payViral">Lien Viral</label>
-      <input id="payViral" type="url" placeholder="Lien du pack Viral" />
-      <label for="payPro">Lien Pro</label>
-      <input id="payPro" type="url" placeholder="Lien du pack Pro" />
-      <button id="savePaymentLinksBtn" class="secondary full" type="button">Sauvegarder les liens</button>
+      <h3 class="admin-subtitle">Coût API OpenAI</h3>
+      <p id="adminCostSummary" class="hint">Journal privé des coûts.</p>
+      <button id="refreshAdminCostLogs" class="secondary full" type="button">Actualiser les coûts</button>
+      <div id="adminCostStatus" class="notice hidden"></div>
+      <div id="adminCostLogs" class="admin-cost-list"></div>
 
-      <h3 class="admin-subtitle">Demandes sur ce téléphone</h3>
-      <div id="paymentRequestsList" class="payment-requests"></div>
+      <h3 class="admin-subtitle">Mises à jour</h3>
+      <button id="manualUpdateBtn" class="secondary full" type="button">Vérifier les mises à jour</button>
+      <div id="adminUpdateStatus" class="notice hidden"></div>
     </section>
 
     <footer class="app-footer">
-      <strong>ViralVoice Pro 4.0.5</strong>
-      <span>GPT-5.6 · Voix premium · Synchronisation temporelle</span>
+      <strong id="footerVersion">ViralVoice Pro 4.1.0</strong>
+      <span>OpenAI · Doublage automatique · Synchronisation temporelle</span>
       <a href="privacy-policy.html" target="_blank" rel="noopener">Politique de confidentialité</a>
     </footer>
   </main>
 
-  <script src="script.js?v=405"></script>
-  <script src="speaker-sync-v36.js?v=405"></script>
-  <script src="audio-presets.js?v=405"></script>
-  <script src="admin-access.js?v=405"></script>
-  <script src="pro-v36.js?v=405"></script>
+  <script src="app-v410.js?v=410"></script>
 </body>
 </html>
