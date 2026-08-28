@@ -47,28 +47,40 @@ function applyAudioPreset(presetName) {
   });
 }
 
-// V4.0.2 : charge un correctif réseau avec une URL unique afin de ne jamais
-// réutiliser le JavaScript 3.6 mis en cache par la WebView/GitHub Pages.
+// Runtime réseau anti-cache.
 (() => {
   const previous = document.getElementById('viralvoiceRuntime402');
   if (previous) previous.remove();
 
   const runtime = document.createElement('script');
   runtime.id = 'viralvoiceRuntime402';
-  runtime.src = `runtime-v402.js?v=402&t=${Date.now()}`;
+  runtime.src = `runtime-v402.js?v=404&t=${Date.now()}`;
   runtime.async = false;
   document.head.appendChild(runtime);
 })();
 
-// V4.0.3 : compteur privé du budget API OpenAI. Le fichier est chargé avec
-// un cache-buster afin que l'APK récupère toujours la dernière version.
+// Compteur privé du budget API OpenAI.
 (() => {
   const previous = document.getElementById('viralvoiceAdminBudget403');
   if (previous) previous.remove();
 
   const counter = document.createElement('script');
   counter.id = 'viralvoiceAdminBudget403';
-  counter.src = `admin-budget-counter.js?v=403&t=${Date.now()}`;
+  counter.src = `admin-budget-counter.js?v=404&t=${Date.now()}`;
   counter.async = false;
   document.head.appendChild(counter);
+})();
+
+// Migration vers la première signature Android stable. Sur les anciennes
+// versions le script sauvegarde automatiquement les données non sensibles ;
+// sur 4.0.4 il les restaure après la reconnexion admin.
+(() => {
+  const previous = document.getElementById('viralvoiceMigrationBackup404');
+  if (previous) previous.remove();
+
+  const migration = document.createElement('script');
+  migration.id = 'viralvoiceMigrationBackup404';
+  migration.src = `migration-backup.js?v=404&t=${Date.now()}`;
+  migration.async = false;
+  document.head.appendChild(migration);
 })();
