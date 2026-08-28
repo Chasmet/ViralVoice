@@ -4,6 +4,7 @@ const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const media = require('../lib/media');
+const fastFinalize = require('../lib/fast-finalize');
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -59,7 +60,13 @@ async function main() {
   const silentBed = path.join(workDir, 'silent.wav');
   const timeline = path.join(workDir, 'timeline.mp3');
   const normalized = path.join(workDir, 'normalized.mp3');
+  const fastOutput = path.join(workDir, 'fast-final.mp3');
   const totalDuration = 4.5;
+  const segments = [
+    { start: 0.25, audioPath: fittedA },
+    { start: 1.55, audioPath: fittedB },
+    { start: 2.75, audioPath: fittedA }
+  ];
 
   try {
     await createTone(sourceA, 440, 1.4);
@@ -71,14 +78,25 @@ async function main() {
     await assertDuration(fittedA, 1.8, 0.12, 'Premier segment recalé');
     await assertDuration(fittedB, 1.1, 0.12, 'Second segment recalé');
 
+    await fastFinalize.runSinglePassMix({
+      segments,
+      outputPath: fastOutput,
+      totalDuration,
+      voiceVolume: 1.05
+    });
+    const fastInfo = await assertDuration(
+      fastOutput,
+      totalDuration,
+      0.16,
+      'Finalisation rapide'
+    );
+    const fastLevel = await media.detectVolumeStats(fastOutput);
+    assertAudible(fastLevel, -10, 'Finalisation rapide');
+
     await media.createSilentAudio(silentBed, totalDuration);
     await media.renderSpeakerTimeline(
       silentBed,
-      [
-        { start: 0.25, audioPath: fittedA },
-        { start: 1.55, audioPath: fittedB },
-        { start: 2.75, audioPath: fittedA }
-      ],
+      segments,
       timeline,
       totalDuration
     );
@@ -105,7 +123,9 @@ async function main() {
     assertAudible(normalizedLevel, -10, 'Voix normalisée');
 
     console.log(
-      `FFmpeg multi-voix OK: ${timelineInfo.duration.toFixed(3)}s, ` +
+      `FFmpeg rapide OK: ${fastInfo.duration.toFixed(3)}s, ` +
+      `fast=${fastLevel.maxVolume.toFixed(1)}dB. ` +
+      `Legacy OK: ${timelineInfo.duration.toFixed(3)}s, ` +
       `timeline=${timelineLevel.maxVolume.toFixed(1)}dB, ` +
       `normalisé=${normalizedLevel.maxVolume.toFixed(1)}dB.`
     );
