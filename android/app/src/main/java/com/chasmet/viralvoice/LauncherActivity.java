@@ -9,7 +9,7 @@ import android.webkit.WebView;
 public class LauncherActivity extends MainActivity {
 
     private static final long UPDATE_CHECK_DELAY_MS = 1800L;
-    private static final long UPDATE_BUTTON_DELAY_MS = 3200L;
+    private static final long RUNTIME_INJECTION_DELAY_MS = 2600L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private UpdateManager updateManager;
@@ -21,22 +21,24 @@ public class LauncherActivity extends MainActivity {
         }
     };
 
-    private final Runnable injectUpdateButton = () -> {
-        if (isFinishing()) {
-            return;
-        }
+    private final Runnable injectNativeRuntime = () -> {
+        if (isFinishing()) return;
         WebView webView = findViewById(R.id.webView);
-        if (webView == null) {
-            return;
-        }
+        if (webView == null) return;
+
+        String cacheBust = String.valueOf(System.currentTimeMillis());
         String script = "(function(){"
+                + "function load(id,src){var old=document.getElementById(id);if(old)old.remove();"
+                + "var s=document.createElement('script');s.id=id;s.src=src;s.async=false;document.head.appendChild(s);}"
+                + "load('nativeRecovery409','https://chasmet.github.io/ViralVoice/recovery-client.js?v=409&t=" + cacheBust + "');"
+                + "load('nativeUpdater409','https://chasmet.github.io/ViralVoice/web-updater.js?v=409&t=" + cacheBust + "');"
                 + "var p=document.getElementById('adminPanel');"
-                + "if(!p||document.getElementById('nativeUpdateCheckBtn'))return;"
+                + "if(p&&!document.getElementById('nativeUpdateCheckBtn')){"
                 + "var h=document.createElement('h3');h.className='admin-subtitle';h.textContent='Mises à jour';"
                 + "var b=document.createElement('button');b.id='nativeUpdateCheckBtn';b.type='button';"
                 + "b.className='secondary full';b.textContent='Vérifier les mises à jour';"
                 + "b.onclick=function(){try{ViralVoiceUpdater.checkNow();}catch(e){alert('Vérification native indisponible.');}};"
-                + "p.appendChild(h);p.appendChild(b);"
+                + "p.appendChild(h);p.appendChild(b);}" 
                 + "})();";
         webView.evaluateJavascript(script, null);
     };
@@ -52,7 +54,7 @@ public class LauncherActivity extends MainActivity {
         }
 
         handler.postDelayed(delayedUpdateCheck, UPDATE_CHECK_DELAY_MS);
-        handler.postDelayed(injectUpdateButton, UPDATE_BUTTON_DELAY_MS);
+        handler.postDelayed(injectNativeRuntime, RUNTIME_INJECTION_DELAY_MS);
     }
 
     @Override
@@ -62,7 +64,7 @@ public class LauncherActivity extends MainActivity {
             updateManager.onResume();
             if (firstResumeDone) {
                 updateManager.checkForUpdates(false, false);
-                handler.postDelayed(injectUpdateButton, 900L);
+                handler.postDelayed(injectNativeRuntime, 900L);
             }
         }
         firstResumeDone = true;
@@ -87,7 +89,7 @@ public class LauncherActivity extends MainActivity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacks(delayedUpdateCheck);
-        handler.removeCallbacks(injectUpdateButton);
+        handler.removeCallbacks(injectNativeRuntime);
         WebView webView = findViewById(R.id.webView);
         if (webView != null) {
             webView.removeJavascriptInterface("ViralVoiceUpdater");
