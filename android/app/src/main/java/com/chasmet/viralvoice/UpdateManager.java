@@ -12,8 +12,14 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.view.Gravity;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONObject;
@@ -24,6 +30,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class UpdateManager {
@@ -37,12 +44,32 @@ public final class UpdateManager {
     private static final String KEY_DOWNLOAD_ID = "download-id";
     private static final String KEY_DOWNLOAD_VERSION = "download-version";
     private static final long PASSIVE_CHECK_INTERVAL_MS = 15L * 60L * 1000L;
+    private static final long PROGRESS_POLL_MS = 500L;
 
     private final Activity activity;
     private final DownloadManager downloadManager;
     private final SharedPreferences preferences;
     private final AtomicBoolean checking = new AtomicBoolean(false);
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
     private boolean receiverRegistered = false;
+    private boolean installPromptShowing = false;
+    private AlertDialog progressDialog;
+    private ProgressBar progressBar;
+    private TextView progressText;
+    private TextView progressDetail;
+    private long progressDownloadId = -1L;
+    private String progressVersion = "";
+
+    private final Runnable progressPoll = new Runnable() {
+        @Override
+        public void run() {
+            if (progressDownloadId == -1L || activity.isFinishing() || activity.isDestroyed()) {
+                return;
+            }
+            updateDownloadProgress(progressDownloadId);
+        }
+    };
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override
@@ -53,6 +80,7 @@ public final class UpdateManager {
             long completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
             long expectedId = preferences.getLong(KEY_DOWNLOAD_ID, -1L);
             if (completedId == expectedId && completedId != -1L) {
+                updateDownloadProgress(completedId);
                 promptInstallIfReady(completedId);
             }
         }
@@ -96,7 +124,6 @@ public final class UpdateManager {
                     return;
                 }
 
-                // On mémorise uniquement une vérification réellement réussie.
                 preferences.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply();
 
                 if (info.versionCode > BuildConfig.VERSION_CODE) {
@@ -116,12 +143,28 @@ public final class UpdateManager {
 
     public void onResume() {
         long downloadId = preferences.getLong(KEY_DOWNLOAD_ID, -1L);
-        if (downloadId != -1L) {
+        if (downloadId == -1L) {
+            return;
+        }
+
+        String downloadedVersion = preferences.getString(KEY_DOWNLOAD_VERSION, "");
+        if (!TextUtils.isEmpty(downloadedVersion)
+                && compareVersions(BuildConfig.VERSION_NAME, downloadedVersion) >= 0) {
+            clearDownloadState();
+            dismissProgressDialog();
+            return;
+        }
+
+        if (isDownloadActive(downloadId)) {
+            showDownloadProgress(downloadId, downloadedVersion);
+        } else {
             promptInstallIfReady(downloadId);
         }
     }
 
     public void destroy() {
+        mainHandler.removeCallbacks(progressPoll);
+        dismissProgressDialog();
         if (!receiverRegistered) {
             return;
         }
@@ -229,6 +272,13 @@ public final class UpdateManager {
             return;
         }
 
+        long existingId = preferences.getLong(KEY_DOWNLOAD_ID, -1L);
+        String existingVersion = preferences.getString(KEY_DOWNLOAD_VERSION, info.versionName);
+        if (existingId != -1L && isDownloadActive(existingId)) {
+            showDownloadProgress(existingId, existingVersion);
+            return;
+        }
+
         String message = info.notes
                 + "\n\nVersion installée : " + BuildConfig.VERSION_NAME
                 + "\nNouvelle version : " + info.versionName
@@ -254,7 +304,8 @@ public final class UpdateManager {
         try {
             long existingId = preferences.getLong(KEY_DOWNLOAD_ID, -1L);
             if (existingId != -1L && isDownloadActive(existingId)) {
-                toast("La mise à jour est déjà en cours de téléchargement.");
+                showDownloadProgress(existingId,
+                        preferences.getString(KEY_DOWNLOAD_VERSION, info.versionName));
                 return;
             }
 
@@ -274,10 +325,125 @@ public final class UpdateManager {
                     .putString(KEY_DOWNLOAD_VERSION, info.versionName)
                     .apply();
 
-            toast("ViralVoice " + info.versionName
-                    + " se télécharge en arrière-plan. Tu peux continuer à utiliser l’application.");
+            showDownloadProgress(downloadId, info.versionName);
         } catch (Exception error) {
             toast("Impossible de démarrer la mise à jour.");
+        }
+    }
+
+    private void showDownloadProgress(long downloadId, String versionName) {
+        activity.runOnUiThread(() -> {
+            if (activity.isFinishing() || activity.isDestroyed()) {
+                return;
+            }
+
+            progressDownloadId = downloadId;
+            progressVersion = TextUtils.isEmpty(versionName) ? "mise à jour" : versionName;
+            mainHandler.removeCallbacks(progressPoll);
+
+            if (progressDialog == null || !progressDialog.isShowing()) {
+                LinearLayout container = new LinearLayout(activity);
+                container.setOrientation(LinearLayout.VERTICAL);
+                container.setGravity(Gravity.CENTER_HORIZONTAL);
+                int padding = dp(24);
+                container.setPadding(padding, dp(8), padding, dp(8));
+
+                progressText = new TextView(activity);
+                progressText.setTextSize(18f);
+                progressText.setText("Téléchargement 0 %");
+                progressText.setGravity(Gravity.CENTER_HORIZONTAL);
+
+                progressBar = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
+                progressBar.setIndeterminate(false);
+                progressBar.setMax(100);
+                progressBar.setProgress(0);
+                LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, dp(14));
+                barParams.setMargins(0, dp(18), 0, dp(12));
+                progressBar.setLayoutParams(barParams);
+
+                progressDetail = new TextView(activity);
+                progressDetail.setTextSize(14f);
+                progressDetail.setGravity(Gravity.CENTER_HORIZONTAL);
+                progressDetail.setText("Préparation du téléchargement…");
+
+                container.addView(progressText);
+                container.addView(progressBar);
+                container.addView(progressDetail);
+
+                progressDialog = new AlertDialog.Builder(activity)
+                        .setTitle("Mise à jour ViralVoice " + progressVersion)
+                        .setView(container)
+                        .create();
+                progressDialog.setCancelable(false);
+                progressDialog.setCanceledOnTouchOutside(false);
+                progressDialog.show();
+            }
+
+            mainHandler.post(progressPoll);
+        });
+    }
+
+    private void updateDownloadProgress(long downloadId) {
+        DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+        try (Cursor cursor = downloadManager.query(query)) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                failProgress("Téléchargement introuvable.");
+                return;
+            }
+
+            int status = getInt(cursor, DownloadManager.COLUMN_STATUS, DownloadManager.STATUS_FAILED);
+            long downloaded = getLong(cursor, DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR, 0L);
+            long total = getLong(cursor, DownloadManager.COLUMN_TOTAL_SIZE_BYTES, -1L);
+
+            if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                activity.runOnUiThread(() -> {
+                    if (progressBar != null) progressBar.setProgress(100);
+                    if (progressText != null) progressText.setText("Téléchargement 100 %");
+                    if (progressDetail != null) {
+                        progressDetail.setText("Téléchargement terminé — préparation de l’installation…");
+                    }
+                });
+                mainHandler.removeCallbacks(progressPoll);
+                mainHandler.postDelayed(() -> promptInstallIfReady(downloadId), 350L);
+                return;
+            }
+
+            if (status == DownloadManager.STATUS_FAILED) {
+                int reason = getInt(cursor, DownloadManager.COLUMN_REASON, -1);
+                clearDownloadState();
+                failProgress("Échec du téléchargement (code " + reason + ").");
+                return;
+            }
+
+            int percent = total > 0 ? (int) Math.min(99L, (downloaded * 100L) / total) : -1;
+            String detail;
+            if (status == DownloadManager.STATUS_PAUSED) {
+                detail = "Téléchargement en pause — reprise automatique…";
+            } else if (status == DownloadManager.STATUS_PENDING) {
+                detail = "Connexion au téléchargement…";
+            } else {
+                detail = formatBytes(downloaded) + (total > 0 ? " / " + formatBytes(total) : " téléchargés");
+            }
+
+            activity.runOnUiThread(() -> {
+                if (progressBar != null) {
+                    progressBar.setIndeterminate(percent < 0);
+                    if (percent >= 0) progressBar.setProgress(percent);
+                }
+                if (progressText != null) {
+                    progressText.setText(percent >= 0
+                            ? "Téléchargement " + percent + " %"
+                            : "Téléchargement en cours…");
+                }
+                if (progressDetail != null) progressDetail.setText(detail);
+            });
+
+            mainHandler.removeCallbacks(progressPoll);
+            mainHandler.postDelayed(progressPoll, PROGRESS_POLL_MS);
+        } catch (Exception error) {
+            mainHandler.removeCallbacks(progressPoll);
+            mainHandler.postDelayed(progressPoll, 1200L);
         }
     }
 
@@ -299,6 +465,10 @@ public final class UpdateManager {
     }
 
     private void promptInstallIfReady(long downloadId) {
+        if (installPromptShowing || activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
+
         DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
         try (Cursor cursor = downloadManager.query(query)) {
             if (cursor == null || !cursor.moveToFirst()) {
@@ -311,12 +481,19 @@ public final class UpdateManager {
             int status = cursor.getInt(statusIndex);
             if (status == DownloadManager.STATUS_FAILED) {
                 clearDownloadState();
+                failProgress("Le téléchargement de la mise à jour a échoué.");
                 return;
             }
             if (status != DownloadManager.STATUS_SUCCESSFUL) {
+                if (isDownloadActive(downloadId)) {
+                    showDownloadProgress(downloadId,
+                            preferences.getString(KEY_DOWNLOAD_VERSION, progressVersion));
+                }
                 return;
             }
         }
+
+        dismissProgressDialog();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && !activity.getPackageManager().canRequestPackageInstalls()) {
@@ -331,22 +508,33 @@ public final class UpdateManager {
         Uri apkUri = downloadManager.getUriForDownloadedFile(downloadId);
         if (apkUri == null) {
             clearDownloadState();
+            toast("Le fichier de mise à jour est introuvable.");
             return;
         }
 
         String versionName = preferences.getString(KEY_DOWNLOAD_VERSION, "mise à jour");
-        new AlertDialog.Builder(activity)
+        installPromptShowing = true;
+        AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle("Mise à jour prête")
                 .setMessage("ViralVoice " + versionName
-                        + " est téléchargé. Appuie sur Installer pour terminer. "
+                        + " est téléchargé à 100 %. Appuie sur Installer pour terminer. "
                         + "Tes données resteront conservées.")
-                .setPositiveButton("Installer", (dialog, which) -> installApk(apkUri))
-                .setNegativeButton("Plus tard", null)
-                .show();
+                .setPositiveButton("Installer", (d, which) -> {
+                    installPromptShowing = false;
+                    installApk(apkUri, versionName);
+                })
+                .setNegativeButton("Plus tard", (d, which) -> installPromptShowing = false)
+                .create();
+        dialog.setOnCancelListener(d -> installPromptShowing = false);
+        dialog.setOnDismissListener(d -> installPromptShowing = false);
+        dialog.show();
     }
 
-    private void installApk(Uri apkUri) {
+    private void installApk(Uri apkUri, String versionName) {
         try {
+            Toast.makeText(activity,
+                    "Installation ViralVoice " + versionName + " — valide Installer sur l’écran Android.",
+                    Toast.LENGTH_LONG).show();
             Intent install = new Intent(Intent.ACTION_VIEW);
             install.setDataAndType(apkUri, "application/vnd.android.package-archive");
             install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -356,8 +544,79 @@ public final class UpdateManager {
         }
     }
 
+    private void failProgress(String message) {
+        activity.runOnUiThread(() -> {
+            mainHandler.removeCallbacks(progressPoll);
+            if (progressText != null) progressText.setText("Mise à jour interrompue");
+            if (progressDetail != null) progressDetail.setText(message);
+            if (progressBar != null) {
+                progressBar.setIndeterminate(false);
+                progressBar.setProgress(0);
+            }
+            mainHandler.postDelayed(this::dismissProgressDialog, 1800L);
+        });
+    }
+
+    private void dismissProgressDialog() {
+        mainHandler.removeCallbacks(progressPoll);
+        progressDownloadId = -1L;
+        progressVersion = "";
+        if (progressDialog != null) {
+            try {
+                if (progressDialog.isShowing()) progressDialog.dismiss();
+            } catch (Exception ignored) {
+                // L'activité peut déjà être en fermeture.
+            }
+        }
+        progressDialog = null;
+        progressBar = null;
+        progressText = null;
+        progressDetail = null;
+    }
+
     private void clearDownloadState() {
         preferences.edit().remove(KEY_DOWNLOAD_ID).remove(KEY_DOWNLOAD_VERSION).apply();
+    }
+
+    private int getInt(Cursor cursor, String column, int fallback) {
+        int index = cursor.getColumnIndex(column);
+        return index >= 0 ? cursor.getInt(index) : fallback;
+    }
+
+    private long getLong(Cursor cursor, String column, long fallback) {
+        int index = cursor.getColumnIndex(column);
+        return index >= 0 ? cursor.getLong(index) : fallback;
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024L) return bytes + " o";
+        if (bytes < 1024L * 1024L) return String.format(Locale.FRANCE, "%.1f Ko", bytes / 1024d);
+        return String.format(Locale.FRANCE, "%.1f Mo", bytes / (1024d * 1024d));
+    }
+
+    private int compareVersions(String left, String right) {
+        String[] a = String.valueOf(left).split("\\.");
+        String[] b = String.valueOf(right).split("\\.");
+        int length = Math.max(a.length, b.length);
+        for (int i = 0; i < length; i++) {
+            int av = parseVersionPart(a, i);
+            int bv = parseVersionPart(b, i);
+            if (av != bv) return av > bv ? 1 : -1;
+        }
+        return 0;
+    }
+
+    private int parseVersionPart(String[] parts, int index) {
+        if (index >= parts.length) return 0;
+        try {
+            return Integer.parseInt(parts[index].replaceAll("[^0-9].*$", ""));
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * activity.getResources().getDisplayMetrics().density);
     }
 
     private void toast(String message) {
