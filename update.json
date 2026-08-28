@@ -1,8 +1,8 @@
 {
-  "versionCode": 25,
-  "versionName": "4.0.12",
-  "title": "ViralVoice 4.0.12 est disponible",
-  "notes": "Mises à jour plus rapides : téléchargement APK direct dans ViralVoice avec progression immédiate. Le gestionnaire Android ne sert plus que de secours. Les données restent conservées.",
-  "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/ViralVoice-4.0.12.apk",
+  "versionCode": 26,
+  "versionName": "4.0.13",
+  "title": "ViralVoice 4.0.13 est disponible",
+  "notes": "Corrige définitivement le retour du résultat : récupération automatique quelques secondes après l'envoi, jeton sauvegardé sur le téléphone et restauration après retour dans l'application. Aucune deuxième génération OpenAI ni deuxième consommation de minutes.",
+  "apkUrl": "https://raw.githubusercontent.com/Chasmet/ViralVoice/apk-builds/ViralVoice-4.0.13.apk",
   "required": false
 }
