@@ -1,0 +1,8 @@
+{
+  "versionCode": 17,
+  "versionName": "4.0.4",
+  "title": "Nouvelle mise à jour ViralVoice",
+  "notes": "Voix améliorées avec référence audio source, priorité automatique à la qualité OpenAI et nouveau système de mise à jour directement dans l'application.",
+  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.4/ViralVoice-4.0.4.apk",
+  "required": false
+}
