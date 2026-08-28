@@ -1,8 +1,8 @@
 {
-  "versionCode": 23,
-  "versionName": "4.0.10",
-  "title": "ViralVoice 4.0.10 est disponible",
-  "notes": "Ajout d'une vraie barre de progression native pour les mises à jour : téléchargement visible de 0 à 100 %, état APK prêt puis ouverture de l'installation Android. Les données restent conservées.",
-  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.10/ViralVoice-4.0.10.apk",
+  "versionCode": 24,
+  "versionName": "4.0.11",
+  "title": "ViralVoice 4.0.11 est disponible",
+  "notes": "Restaure le compteur privé admin, l'accès aux réglages administrateur et l'ajout rapide de minutes. Le correctif est injecté nativement pour éviter les problèmes de cache. Les données restent conservées.",
+  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.11/ViralVoice-4.0.11.apk",
   "required": false
 }
