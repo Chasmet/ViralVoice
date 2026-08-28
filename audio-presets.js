@@ -1,20 +1,8 @@
 const AUDIO_PRESETS = {
-  solo: {
-    voice: 105,
-    original: 0
-  },
-  balanced: {
-    voice: 105,
-    original: 10
-  },
-  original: {
-    voice: 110,
-    original: 25
-  },
-  power: {
-    voice: 125,
-    original: 0
-  }
+  solo: { voice: 105, original: 0 },
+  balanced: { voice: 105, original: 10 },
+  original: { voice: 110, original: 25 },
+  power: { voice: 125, original: 0 }
 };
 
 const presetRadios = document.querySelectorAll('input[name="audioPreset"]');
@@ -47,38 +35,19 @@ function applyAudioPreset(presetName) {
   });
 }
 
-// V4.0.5 : cache versionné. Le navigateur ne retélécharge plus ces scripts à
-// chaque ouverture, mais une nouvelle version reste immédiatement récupérée
-// dès que le numéro ?v= change.
-(() => {
-  const previous = document.getElementById('viralvoiceRuntime402');
+function loadVersionedScript(id, src) {
+  const previous = document.getElementById(id);
   if (previous) previous.remove();
+  const script = document.createElement('script');
+  script.id = id;
+  script.src = src;
+  script.async = false;
+  document.head.appendChild(script);
+}
 
-  const runtime = document.createElement('script');
-  runtime.id = 'viralvoiceRuntime402';
-  runtime.src = 'runtime-v402.js?v=405';
-  runtime.async = false;
-  document.head.appendChild(runtime);
-})();
-
-(() => {
-  const previous = document.getElementById('viralvoiceAdminBudget403');
-  if (previous) previous.remove();
-
-  const counter = document.createElement('script');
-  counter.id = 'viralvoiceAdminBudget403';
-  counter.src = 'admin-budget-counter.js?v=405';
-  counter.async = false;
-  document.head.appendChild(counter);
-})();
-
-(() => {
-  const previous = document.getElementById('viralvoiceMigrationBackup404');
-  if (previous) previous.remove();
-
-  const migration = document.createElement('script');
-  migration.id = 'viralvoiceMigrationBackup404';
-  migration.src = 'migration-backup.js?v=405';
-  migration.async = false;
-  document.head.appendChild(migration);
-})();
+// V4.0.8 : les modules distants sont versionnés. L'updater web est indépendant
+// du module Android afin que même une ancienne APK puisse proposer la MAJ.
+loadVersionedScript('viralvoiceRuntime402', 'runtime-v402.js?v=408');
+loadVersionedScript('viralvoiceAdminBudget403', 'admin-budget-counter.js?v=408');
+loadVersionedScript('viralvoiceMigrationBackup404', 'migration-backup.js?v=408');
+loadVersionedScript('viralvoiceWebUpdater408', 'web-updater.js?v=408');
