@@ -1,8 +1,8 @@
 {
-  "versionCode": 17,
-  "versionName": "4.0.4",
-  "title": "Nouvelle mise à jour ViralVoice",
-  "notes": "Voix améliorées avec référence audio source, priorité automatique à la qualité OpenAI et nouveau système de mise à jour directement dans l'application.",
-  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.4/ViralVoice-4.0.4.apk",
+  "versionCode": 18,
+  "versionName": "4.0.5",
+  "title": "ViralVoice 4.0.5 est disponible",
+  "notes": "Traduction et doublage nettement plus rapides grâce au traitement parallèle contrôlé. Interface Android plus fluide avec cache WebView conservé et vérification de mise à jour décalée après l'affichage.",
+  "apkUrl": "https://github.com/Chasmet/ViralVoice/releases/download/v4.0.5/ViralVoice-4.0.5.apk",
   "required": false
 }
