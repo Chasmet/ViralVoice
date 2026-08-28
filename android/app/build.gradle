@@ -16,8 +16,8 @@ android {
         applicationId 'com.chasmet.viralvoice'
         minSdk 21
         targetSdk 34
-        versionCode 25
-        versionName '4.0.12'
+        versionCode 26
+        versionName '4.0.13'
     }
 
     buildFeatures {
@@ -60,9 +60,8 @@ dependencies {
     implementation 'androidx.core:core:1.13.1'
 }
 
-// V4.0.12 : même signature stable et données conservées. Les mises à jour
-// utilisent un téléchargement HTTP direct avec progression immédiate et
-// DownloadManager uniquement comme secours.
+// V4.0.13 : récupération persistante des résultats. Le jeton de génération
+// est conservé dans le téléphone et la récupération commence après quelques secondes.
 tasks.configureEach { task ->
     if (task.name == 'preDebugBuild' || task.name == 'preReleaseBuild') {
         task.doFirst {
@@ -74,8 +73,8 @@ tasks.configureEach { task ->
             def source = mainActivity.getText('UTF-8')
             source = source
                     .replace('https://chasmet.github.io/ViralVoice/?app=365',
-                            'https://chasmet.github.io/ViralVoice/?app=412')
-                    .replace('ViralVoiceAndroid/3.6.5', 'ViralVoiceAndroid/4.0.12')
+                            'https://chasmet.github.io/ViralVoice/?app=413')
+                    .replace('ViralVoiceAndroid/3.6.5', 'ViralVoiceAndroid/4.0.13')
                     .replace('webView.clearCache(true);\n            webView.loadUrl(APP_URL + "&t=" + System.currentTimeMillis());',
                             'webView.loadUrl(APP_URL);')
 
