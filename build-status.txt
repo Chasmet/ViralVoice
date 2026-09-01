@@ -1,0 +1,9 @@
+status=success
+version=4.1.0
+version_code=29
+signed=stable-release
+signer_sha256=AD:54:87:3D:60:DF:3C:0E:78:15:1E:6E:F9:1C:CE:FA:B4:7D:D3:01:61:24:10:23:7C:57:95:4B:4D:85:9C:E6
+commit=0a93a4444e527e1a888a57e33df22bf375a18b69
+branch=main
+workflow_run=33497779717
+generated_at=2026-09-01T10:31:36Z
