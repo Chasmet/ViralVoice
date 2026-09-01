@@ -1,12 +1,12 @@
 {
   "name": "viralvoice",
-  "version": "4.0.9",
-  "description": "ViralVoice - doublage IA OpenAI avec récupération automatique du résultat si la connexion mobile perd la réponse finale.",
+  "version": "4.1.1",
+  "description": "ViralVoice 4.1.1 - traduction OpenAI compatible et finalisation robuste des vidéos longues multi-segments.",
   "main": "server-v3.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node -r ./runtime-limits.js -r ./lib/result-recovery-patch.js -r ./lib/fast-mux-patch.js -r ./lib/ci-signing-bridge.js server-v3.js",
-    "check": "node --check server-v3.js && node --check runtime-limits.js && node --check admin-access.js && node --check speaker-sync-v35.js && node --check speaker-sync-v36.js && node --check pro-v35.js && node --check pro-v36.js && node --check web-updater.js && node --check recovery-client.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/media-extra.js && node --check lib/speech-sync.js && node --check lib/realtime-translate.js && node --check lib/quality-voice.js && node --check lib/fast-finalize.js && node --check lib/fast-mux.js && node --check lib/fast-mux-patch.js && node --check lib/result-recovery-patch.js && node --check lib/auto-dubbing.js && node --check lib/cost-meter.js && node --check lib/ci-signing-bridge.js && node --check scripts/media-fit-smoke.js && node --check scripts/recovery-smoke.js && node scripts/media-fit-smoke.js && node scripts/recovery-smoke.js"
+    "start": "node -r ./runtime-limits.js -r ./lib/translation-compat-patch.js -r ./lib/result-recovery-patch.js -r ./lib/fast-mux-patch.js -r ./lib/ci-signing-bridge.js server-v3.js",
+    "check": "node --check server-v3.js && node --check runtime-limits.js && node --check admin-access.js && node --check speaker-sync-v35.js && node --check speaker-sync-v36.js && node --check pro-v35.js && node --check pro-v36.js && node --check web-updater.js && node --check recovery-client.js && node --check lib/config.js && node --check lib/utils.js && node --check lib/database.js && node --check lib/media.js && node --check lib/media-extra.js && node --check lib/speech-sync.js && node --check lib/translation-compat-patch.js && node --check lib/realtime-translate.js && node --check lib/quality-voice.js && node --check lib/fast-finalize.js && node --check lib/fast-mux.js && node --check lib/fast-mux-patch.js && node --check lib/result-recovery-patch.js && node --check lib/auto-dubbing.js && node --check lib/cost-meter.js && node --check lib/ci-signing-bridge.js && node --check scripts/media-fit-smoke.js && node --check scripts/recovery-smoke.js && node --check scripts/long-video-smoke.js && node scripts/media-fit-smoke.js && node scripts/recovery-smoke.js && node scripts/long-video-smoke.js"
   },
   "engines": {
     "node": ">=22"
